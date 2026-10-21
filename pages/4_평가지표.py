@@ -1,14 +1,6 @@
-import importlib
-import os
-
 import streamlit as st
 
-import lab.engine
-
-# 클라우드는 새 커밋을 받아도 이미 불러온 진행기 모듈을 그대로 쓴다. 파일이 바뀌었으면 다시 읽는다
-if getattr(lab.engine, "MTIME", None) != os.path.getmtime(lab.engine.__file__):
-    importlib.reload(lab.engine)
-from lab.engine import run_chat  # noqa: E402
+from lab.fresh import engine
 
 st.set_page_config(page_title="평가지표·결과", page_icon="📏", layout="centered")
-run_chat("eval")
+engine().run_chat("eval")

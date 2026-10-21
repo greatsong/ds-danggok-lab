@@ -2,7 +2,7 @@
 
 시나리오(content/<이름>.json)의 대사를 한 단계씩 보여 주고, AI가 준 코드를 그 자리에서 실행해
 결과를 보여 준다. 화면에 보이는 코드와 실행하는 코드는 같은 문자열이다.
-새 페이지(모델, 평가)는 시나리오 파일을 하나 더 쓰고 pages/ 에 run_chat('<이름>')을 부르는 파일을 더하면 된다.
+새 페이지는 시나리오 파일을 하나 더 쓰고 pages/ 에 lab.fresh.engine().run_chat('<이름>')을 부르는 파일을 더하면 된다.
 
 시나리오 형식
 {
@@ -24,7 +24,6 @@
 """
 import builtins
 import json
-import os
 from pathlib import Path
 
 import numpy as np
@@ -33,7 +32,6 @@ import plotly.express as px
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
-MTIME = os.path.getmtime(__file__)   # 페이지가 이 값으로 진행기가 바뀌었는지 안다
 
 
 @st.cache_data(show_spinner='데이터를 불러오는 중…')
