@@ -1,0 +1,99 @@
+{
+ "title": "전처리",
+ "intro": "이 페이지에서는 살펴보기에서 찾은 문제를 하나씩 처리합니다. bmi 빈 값, 흡연 Unknown, bmi 이상치 후보, 한 명뿐인 범주, id 열을 차례로 처리합니다. 처리할 때마다 뇌졸중 비율이 달라지지 않았는지 확인합니다. 중간에 AI가 틀린 제안을 하는데, 학생이 그 제안을 그대로 따르지 않고 직접 확인하는 과정을 눈여겨봅니다.",
+ "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")",
+ "setup_note": "이 페이지는 데이터 살펴보기 페이지에서 읽은 데이터(`df`)에서 이어집니다.",
+ "steps": [
+  {
+   "who": "student",
+   "text": "bmi 열의 빈 값 201개를 어떻게 처리하면 좋을지 알려 줘. 코드도 같이 줘."
+  },
+  {
+   "who": "ai",
+   "text": "빈 값은 전체의 약 4%뿐이라 빈 값이 있는 행을 지워도 분석에 큰 영향이 없습니다. 가장 간단한 방법으로 지우는 코드를 드립니다.",
+   "code": "df_drop = df.dropna(subset=[\"bmi\"])\nst.write(\"지우기 전:\", len(df), \"행 → 지운 뒤:\", len(df_drop), \"행\")",
+   "flag": "wrong"
+  },
+  {
+   "who": "check",
+   "text": "4%라도 그 안에 뇌졸중 환자가 몇 명 있었는지 알고 싶어. 지우기 전후의 뇌졸중 환자 수, 그리고 빈 값 행과 나머지 행의 뇌졸중 비율을 비교해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "지우기 전후의 뇌졸중 환자 수와 비율을 비교하는 코드입니다.",
+   "code": "before = df[\"stroke\"].sum()\nafter = df_drop[\"stroke\"].sum()\nst.write(\"뇌졸중 환자:\", before, \"명 →\", after, \"명\")\nst.write(\"사라진 환자:\", before - after, \"명\")\n\nna_rate = df[df[\"bmi\"].isna()][\"stroke\"].mean() * 100\nrest_rate = df[df[\"bmi\"].notna()][\"stroke\"].mean() * 100\nst.write(\"빈 값 행의 뇌졸중 비율:\", round(na_rate, 1), \"%\")\nst.write(\"나머지 행의 뇌졸중 비율:\", round(rest_rate, 1), \"%\")",
+   "after": "확인해 보니 앞의 제안이 틀렸습니다. 지우면 뇌졸중 환자 249명 가운데 40명(16.1%)이 사라집니다. 빈 값이 있는 행의 뇌졸중 비율은 19.9%로 나머지(4.3%)보다 훨씬 높아, 빈 값이 무작위로 생긴 것이 아닙니다. 이런 행을 지우면 데이터가 한쪽으로 치우치므로 지우지 않는 방법을 써야 합니다."
+  },
+  {
+   "who": "note",
+   "title": "검증 기록 남기기",
+   "text": "AI의 제안을 직접 확인해 바꾼 과정은 log에 그대로 남깁니다. 무엇을 확인했고 어떤 수치를 보고 결정을 바꿨는지 적습니다.\n\n```text\n## 20203 김도윤\n- 오늘 결정한 것: bmi 빈 값을 지우지 않고 채우기로 함\n- AI에게 보낸 프롬프트(원문): 4%라도 그 안에 뇌졸중 환자가 몇 명 있었는지 알고 싶어. 지우기 전후의 뇌졸중 환자 수, 그리고 빈 값 행과 나머지 행의 뇌졸중 비율을 비교해 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: AI는 4%라 지워도 된다고 했지만, 확인해 보니 뇌졸중 환자 40명(16.1%)이 사라지고 빈 값 행의 뇌졸중 비율이 19.9%로 높아서 지우는 방법을 버림\n- 느낀 점: 비율이 작다는 말만 믿었으면 결과가 한쪽으로 치우칠 뻔했음\n```"
+  },
+  {
+   "who": "student",
+   "text": "지우지 말고 채우는 방법으로 바꿔 줘. 어떤 행을 채웠는지 표시도 남기고 싶어."
+  },
+  {
+   "who": "ai",
+   "text": "중앙값으로 채우고 원래 빈 값이었는지 알려 주는 표시 열 bmi_missing을 더하는 코드입니다. 평균 대신 중앙값을 쓰는 이유는 97.6 같은 극단값에 덜 흔들리기 때문입니다.",
+   "code": "df_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\nmedian_bmi = df_prep[\"bmi\"].median()\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(median_bmi)\n\nst.write(\"채운 값(중앙값):\", median_bmi)\nst.write(\"남은 빈 값:\", df_prep[\"bmi\"].isna().sum(), \"개\")",
+   "after": "채운 값은 28.1이고 남은 빈 값은 0개입니다. bmi_missing 열 덕분에 원래 비어 있던 201명을 나중에도 구분할 수 있고, 모델을 만들 때 이 열을 쓸지도 정할 수 있습니다."
+  },
+  {
+   "who": "student",
+   "text": "smoking_status의 Unknown 1,544명은 어떻게 할지 알려 줘. 흡연 상태별 뇌졸중 비율을 막대그래프로 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "흡연 상태별 뇌졸중 비율을 비교하는 코드입니다.",
+   "code": "rate = df_prep.groupby(\"smoking_status\")[\"stroke\"].mean().mul(100).round(1)\nst.write(rate.rename(\"뇌졸중 비율(%)\"))\nfig = px.bar(x=rate.index, y=rate.values, labels={\"x\": \"흡연 상태\", \"y\": \"뇌졸중 비율(%)\"})\nst.plotly_chart(fig)",
+   "after": "뇌졸중 비율은 Unknown 3.0%, 예전에 피움 7.9%, 지금 피움 5.3%, 피운 적 없음 4.8%입니다. Unknown은 어린이가 많아 비율이 낮습니다. 지우면 1,544명(약 30%)이 사라지므로 Unknown을 하나의 범주로 그대로 두는 방법을 제안합니다. 어떻게 할지는 팀이 정하고 그 이유를 기록합니다."
+  },
+  {
+   "who": "student",
+   "text": "bmi 97.6 같은 값이 이상치인지 알려 줘. 이상치는 결측치와 무엇이 다른지도 설명해 줘. bmi를 상자그림으로 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "결측치는 값이 아예 없는 것이고, 이상치는 값은 있지만 다른 값들과 크게 동떨어진 것입니다. 사분위수 범위(IQR)로 위쪽 경계를 계산하고 상자그림을 그리는 코드를 드립니다.",
+   "code": "q1 = df_prep[\"bmi\"].quantile(0.25)\nq3 = df_prep[\"bmi\"].quantile(0.75)\nupper = q3 + 1.5 * (q3 - q1)\n\nst.write(\"위쪽 경계:\", round(upper, 1))\nst.write(\"경계를 넘는 사람:\", (df_prep[\"bmi\"] > upper).sum(), \"명\")\nst.write(\"60을 넘는 값:\", (df_prep[\"bmi\"] > 60).sum(), \"개\")\nfig = px.box(df_prep, y=\"bmi\")\nst.plotly_chart(fig)",
+   "after": "위쪽 경계는 46.3이고 이 경계를 넘는 사람은 125명입니다. 125명을 모두 지우면 비만인 사람이 데이터에서 빠지므로, 이상치라고 모두 틀린 값은 아닙니다. 사람에게서 나오기 매우 드문 값(예: 60을 넘는 13개)만 팀이 기준을 정해 처리하는 것이 좋습니다."
+  },
+  {
+   "who": "student",
+   "text": "60을 넘는 bmi 값 13개를 60으로 맞추는 방법으로 처리해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "60을 넘는 값을 60으로 맞추는 코드입니다.",
+   "code": "over = (df_prep[\"bmi\"] > 60).sum()\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\nst.write(\"60으로 맞춘 값:\", over, \"개\")\nst.write(\"행 수:\", len(df_prep))\nst.write(df_prep[\"bmi\"].describe().round(1))",
+   "after": "13개 값이 60으로 바뀌었고 행 수는 그대로입니다. 60이라는 기준은 팀이 정한 값이므로 왜 60인지 README와 log에 적어 둡니다."
+  },
+  {
+   "who": "student",
+   "text": "gender의 Other 1명과 id 열은 어떻게 하면 좋을지 알려 줘."
+  },
+  {
+   "who": "ai",
+   "text": "Other는 한 명뿐이라 모델이 이 범주에서 규칙을 배울 수 없으므로 팀이 논의해 제외할 수 있습니다. id는 사람마다 다른 번호라 예측에 도움이 되지 않고, 모델이 번호를 외워 버릴 수 있으므로 지웁니다. 두 가지를 처리하는 코드를 드립니다.",
+   "code": "df_prep = df_prep[df_prep[\"gender\"] != \"Other\"]\ndf_prep = df_prep.drop(columns=[\"id\"])\nst.write(\"행 개수:\", df_prep.shape[0], \" / 열 개수:\", df_prep.shape[1])\nst.write(list(df_prep.columns))",
+   "after": "5,109행 12열이 되었습니다. id가 빠지고 bmi_missing이 더해져 열 수는 그대로입니다."
+  },
+  {
+   "who": "student",
+   "text": "전처리 전후를 표로 비교하고 뇌졸중 비율이 달라지지 않았는지 확인해 줘. 전처리한 데이터를 CSV로 내려받는 버튼도 만들어 줘."
+  },
+  {
+   "who": "ai",
+   "text": "전후 비교 표와 내려받기 버튼을 만드는 코드입니다.",
+   "code": "compare = pd.DataFrame({\n    \"전처리 전\": [len(df), df.shape[1], df[\"bmi\"].isna().sum(), round(df[\"stroke\"].mean() * 100, 2)],\n    \"전처리 후\": [len(df_prep), df_prep.shape[1], df_prep[\"bmi\"].isna().sum(), round(df_prep[\"stroke\"].mean() * 100, 2)],\n}, index=[\"행 수\", \"열 수\", \"bmi 빈 값\", \"뇌졸중 비율(%)\"])\nst.dataframe(compare)\n\ncsv = df_prep.to_csv(index=False).encode(\"utf-8\")\nst.download_button(\"전처리한 데이터 내려받기\", csv, \"stroke_prep.csv\", \"text/csv\")",
+   "after": "행은 5,110개에서 5,109개로, bmi 빈 값은 201개에서 0개로 바뀌었습니다. 뇌졸중 비율은 4.87%로 전처리 전과 같습니다. 내려받은 파일은 다음 단계(모델 만들기)에서 씁니다."
+  },
+  {
+   "who": "note",
+   "title": "전처리 결정표",
+   "text": "전처리에서 내린 결정과 그 근거를 표로 정리해 README에 옮깁니다.\n\n| 문제 | 결정 | 근거 수치 |\n|---|---|---|\n| `bmi` 빈 값 201개 | 중앙값 28.1로 채우고 `bmi_missing` 열을 더함 | 지우면 뇌졸중 환자 40명(16.1%)이 사라짐. 빈 값 행의 뇌졸중 비율 19.9%, 나머지 4.3% |\n| `smoking_status`의 Unknown | 하나의 범주로 그대로 둠 | 1,544명(약 30%), 대부분 어린이. Unknown의 뇌졸중 비율 3.0% |\n| `bmi` 60 초과 13개 | 60으로 맞춤 | IQR 위쪽 경계(46.3)를 넘는 125명은 그대로 둠 |\n| `gender`의 Other 1명 | 제외 | 한 명뿐인 범주 |\n| `id` | 삭제 | 사람마다 다른 번호 |\n| `stroke` 비율 | 확인 | 전처리 전후 모두 4.87% |"
+  }
+ ],
+ "summary": "다음 페이지에서는 전처리한 데이터로 모델을 만들고 평가합니다(준비 중). 각 결정의 근거 수치를 기록해 두면 구술 인터뷰에서 바로 설명할 수 있습니다."
+}

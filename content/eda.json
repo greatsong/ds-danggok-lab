@@ -1,0 +1,72 @@
+{
+ "title": "데이터 살펴보기",
+ "intro": "이 페이지에서는 데이터를 처음 열어 크기, 빈 값, 분포, 글자 값, 목표 열의 비율을 차례로 살펴보고 전처리가 필요한 곳을 찾습니다. 다음 구술 인터뷰의 시작 질문인 \"데이터를 처음 열었을 때 무엇을 발견했나요?\"에 답할 재료가 이 과정에서 나옵니다.",
+ "steps": [
+  {
+   "who": "student",
+   "text": "스트림릿 앱으로 뇌졸중 데이터를 처음 열어 보는 화면을 만들어 줘.\n- 데이터 주소 https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv, 열 이름 id, gender, age, hypertension, heart_disease, ever_married, work_type, Residence_type, avg_glucose_level, bmi, smoking_status, stroke, 인코딩 UTF-8\n- 화면에 행 개수와 열 개수, 앞의 10행, 열마다 자료형을 보여 줘"
+  },
+  {
+   "who": "ai",
+   "text": "데이터를 읽어 크기, 앞부분 10행, 열마다 자료형을 보여 주는 코드입니다.",
+   "code": "import pandas as pd\nimport streamlit as st\n\nurl = \"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\"\ndf = pd.read_csv(url, encoding=\"utf-8\")\n\nst.write(\"행 개수:\", df.shape[0], \" / 열 개수:\", df.shape[1])\nst.dataframe(df.head(10))\nst.write(df.dtypes.astype(str).rename(\"자료형\"))",
+   "after": "데이터는 5,110행 12열입니다. age, avg_glucose_level, bmi 같은 숫자 열과 gender, smoking_status 같은 글자 열이 섞여 있습니다. hypertension, heart_disease, stroke는 0과 1로 된 숫자 열입니다. id는 사람마다 다른 번호라 분석에 쓰는 값이 아닙니다."
+  },
+  {
+   "who": "student",
+   "text": "열마다 빈 값이 몇 개인지 표와 막대그래프(plotly)로 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "빈 값을 세어 빈 값이 있는 열만 표와 막대그래프로 보여 주는 코드입니다.",
+   "code": "import plotly.express as px\n\nmissing = df.isna().sum()\nmissing = missing[missing > 0]\nst.write(missing.rename(\"빈 값 개수\"))\nfig = px.bar(x=missing.index, y=missing.values, labels={\"x\": \"열\", \"y\": \"빈 값 개수\"})\nst.plotly_chart(fig)",
+   "after": "빈 값은 bmi 열에만 201개, 전체의 약 3.9% 있습니다. 빈 값이 없다고 표시된 열도 글자 값 가운데 실제로는 모르는 값이 섞여 있을 수 있으니 글자 열도 살펴봐야 합니다."
+  },
+  {
+   "who": "student",
+   "text": "숫자 열 age, avg_glucose_level, bmi의 분포를 히스토그램으로 보여 줘. 드롭다운으로 열을 고를 수 있게 하고 최솟값, 평균, 최댓값 같은 요약 통계도 함께 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "고른 열의 히스토그램과 요약 통계를 보여 주는 코드입니다.",
+   "code": "col = st.selectbox(\"열 고르기\", [\"age\", \"avg_glucose_level\", \"bmi\"])\nfig = px.histogram(df, x=col, nbins=50)\nst.plotly_chart(fig)\nst.write(df[col].describe().round(2))",
+   "after": "- avg_glucose_level은 가운데 절반이 77에서 114인데 최댓값이 271.7로 오른쪽으로 긴 꼬리가 있습니다.\n- bmi의 최댓값 97.6은 다른 값과 크게 떨어져 있어 이상치 후보입니다.\n- age의 최솟값은 0.08입니다. 1세 미만 아기 43명의 나이를 소수로 적은 것이라 잘못 적힌 값이 아닙니다.\n\n드롭다운으로 열을 바꿔 가며 직접 확인하세요."
+  },
+  {
+   "who": "student",
+   "text": "글자 열 gender, smoking_status, work_type에 어떤 값이 몇 개씩 있는지 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "세 열의 값 종류와 개수를 세는 코드입니다.",
+   "code": "for col in [\"gender\", \"smoking_status\", \"work_type\"]:\n    st.write(df[col].value_counts())",
+   "after": "- smoking_status의 Unknown이 1,544명, 약 30%입니다.\n- gender의 Other는 1명뿐입니다.\n- work_type의 children이 687명입니다."
+  },
+  {
+   "who": "student",
+   "text": "smoking_status의 Unknown이 1,544명이나 되는데 사실상 빈 값 아니냐는 의문이 들었어. Unknown인 사람들의 나이를 전체와 비교하고, 나이 히스토그램을 Unknown과 나머지로 색을 나눠 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "좋은 관찰입니다. Unknown 여부로 나누어 나이를 비교하는 코드입니다.",
+   "code": "unknown = df[df[\"smoking_status\"] == \"Unknown\"]\nst.write(\"Unknown 인원:\", len(unknown), \"명\")\nst.write(\"나이 중앙값:\", unknown[\"age\"].median(), \"세(Unknown) /\", df[\"age\"].median(), \"세(전체)\")\nst.write(\"18세 미만:\", (unknown[\"age\"] < 18).sum(), \"명\")\n\ngroup = df[\"smoking_status\"].eq(\"Unknown\").map({True: \"Unknown\", False: \"나머지\"})\nfig = px.histogram(df, x=\"age\", color=group, barmode=\"overlay\", nbins=40, labels={\"color\": \"흡연 정보\"})\nst.plotly_chart(fig)",
+   "after": "Unknown인 사람의 나이 중앙값은 23세로 전체 45세보다 훨씬 낮고, 682명이 18세 미만입니다. 어린이에게 흡연 여부를 묻지 않아 Unknown으로 적혔을 가능성이 큽니다. 이처럼 값은 적혀 있지만 실제로는 모르는 값을 숨은 결측치라고 합니다. 지우면 어린이 데이터가 크게 줄어들므로 처리 방법은 전처리 단계에서 정합니다."
+  },
+  {
+   "who": "student",
+   "text": "stroke가 1인 사람의 수와 비율을 보여 주고 원그래프로 그려 줘."
+  },
+  {
+   "who": "ai",
+   "text": "목표 열 stroke의 개수와 비율을 보여 주는 코드입니다.",
+   "code": "counts = df[\"stroke\"].value_counts()\nst.write(counts)\nst.write(\"뇌졸중 비율:\", round(df[\"stroke\"].mean() * 100, 1), \"%\")\nfig = px.pie(names=[\"없음(0)\", \"있음(1)\"], values=[counts[0], counts[1]])\nst.plotly_chart(fig)",
+   "after": "뇌졸중을 겪은 사람은 249명, 4.9%입니다. 모든 사람을 \"뇌졸중 없음\"으로 예측해도 정확도가 약 95%가 나오므로, 12차시에서 배운 것처럼 정확도만으로는 모델을 판단할 수 없습니다. 전처리를 할 때마다 이 비율이 달라지지 않는지 확인해야 합니다."
+  },
+  {
+   "who": "note",
+   "title": "살펴보기에서 발견한 것",
+   "text": "살펴보기에서 발견한 것을 표로 정리하면 전처리에서 할 일이 정해집니다.\n\n| 발견한 것 | 수치 | 전처리에서 할 일 |\n|---|---|---|\n| `bmi` 빈 값 | 201개(약 3.9%) | 처리 방법 정하기 |\n| `smoking_status`의 Unknown(숨은 결측치) | 1,544명, 나이 중앙값 23세 | 지울지, 범주로 둘지 정하기 |\n| `bmi` 이상치 후보 | 최댓값 97.6 | 기준을 정해 처리하기 |\n| `gender`의 Other | 1명 | 처리 방법 정하기 |\n| `id` | 5,110개가 모두 다른 번호 | 분석에서 빼기 |\n| `stroke` 비율 | 249명(4.9%) | 전처리 뒤에도 같은지 확인하기 |\n| `avg_glucose_level` 분포 | 가운데 절반 77~114, 최댓값 271.7 | 모델 단계에서 다시 보기 |\n\n**log 기록 예시**\n\n```text\n## 20203 김도윤\n- 오늘 결정한 것: bmi 빈 값, 흡연 Unknown, bmi 97.6, gender Other 1명을 전처리에서 처리하기로 함\n- AI에게 보낸 프롬프트(원문): smoking_status의 Unknown이 1,544명이나 되는데 사실상 빈 값 아니냐는 의문이 들었어. Unknown인 사람들의 나이를 전체와 비교하고, 나이 히스토그램을 Unknown과 나머지로 색을 나눠 보여 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: 빈 값 개수만 세면 bmi 201개만 나오지만, 글자 값을 따로 세어 보니 Unknown이 1,544명 있어서 숨은 결측치로 따로 기록함\n- 느낀 점: 빈 값 개수만 보고 끝냈으면 놓쳤을 것을 직접 세어 보고 찾았음\n```"
+  }
+ ],
+ "summary": "다음 페이지인 전처리에서 이 표의 문제를 하나씩 처리합니다. 처리할 때마다 뇌졸중 비율이 달라지지 않는지 확인합니다."
+}
