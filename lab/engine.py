@@ -24,6 +24,7 @@
 """
 import builtins
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,7 @@ import plotly.express as px
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
+MTIME = os.path.getmtime(__file__)   # 페이지가 이 값으로 진행기가 바뀌었는지 안다
 
 
 @st.cache_data(show_spinner='데이터를 불러오는 중…')
