@@ -30,7 +30,7 @@
    "who": "ai",
    "text": "고른 열의 히스토그램과 요약 통계를 보여 주는 코드입니다.",
    "code": "col = st.selectbox(\"열 고르기\", [\"age\", \"avg_glucose_level\", \"bmi\"])\nfig = px.histogram(df, x=col, nbins=50)\nst.plotly_chart(fig)\nst.write(df[col].describe().round(2))",
-   "after": "- avg_glucose_level은 가운데 절반이 77에서 114인데 최댓값이 271.7로 오른쪽으로 긴 꼬리가 있습니다.\n- bmi의 최댓값 97.6은 다른 값과 크게 떨어져 있어 이상치 후보입니다.\n- age의 최솟값은 0.08입니다. 1세 미만 아기 43명의 나이를 소수로 적은 것이라 잘못 적힌 값이 아닙니다.\n\n드롭다운으로 열을 바꿔 가며 직접 확인하세요."
+   "after": "- avg_glucose_level은 가운데 절반이 77에서 114인데 최댓값이 271.7로 오른쪽으로 긴 꼬리가 있습니다.\n- bmi의 최댓값 97.6은 다른 값과 크게 떨어져 있어 이상치 후보입니다.\n- age의 최솟값은 0.08입니다. 1세 미만 아기 43명의 나이를 소수로 적은 것이라 잘못 적힌 값이 아닙니다.\n\n드롭다운으로 열을 바꿔 가며 직접 확인할 수 있습니다."
   },
   {
    "who": "student",
