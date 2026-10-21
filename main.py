@@ -17,7 +17,7 @@ md(home["intro"])
 for s in home["stages"]:
     with st.container(border=True):
         left, right = st.columns([1, 3])
-        left.markdown("**%s %s**  \n:gray[%s]" % (s["no"], s["title"], s["lesson"]))
+        left.markdown("**%s %s**" % (s["no"], s["title"]))
         with right:
             md(s["do"])
             if s["pages"]:

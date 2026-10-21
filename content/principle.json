@@ -1,0 +1,91 @@
+{
+ "title": "모델 원리",
+ "intro": "이 페이지에서는 평가지표·결과 페이지에서 고른 최종 모델, 가중치를 켠 로지스틱 회귀가 어떤 원리로 확률을 계산하는지 시험용 데이터의 환자 한 명으로 직접 따라가며 AI에게 묻습니다. 후보였던 결정 트리와 랜덤 포레스트가 같은 환자를 어떻게 예측했는지 비교하고, 마지막에는 이해한 내용을 자기 말로 설명해 확인받습니다. 구술 인터뷰 ③과 포스터 문답에서 받는 모델 질문에 답할 내용이 이 대화에 모두 나옵니다.",
+ "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nweighted = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=\"balanced\")),\n    \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n}\nfor m in weighted.values():\n    m.fit(X_train, y_train)\nplain = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X_train, y_train)\nmodel = weighted[\"로지스틱 회귀\"]",
+ "setup_note": "이 페이지는 평가지표·결과 페이지에서 고른 최종 모델(가중치를 켠 로지스틱 회귀)과 후보 모델 둘에서 이어집니다.",
+ "steps": [
+  {
+   "who": "student",
+   "text": "최종 모델로 가중치를 켠 로지스틱 회귀를 골랐어. 이 모델이 한 사람의 뇌졸중 확률을 어떻게 계산하는지 시험용 데이터의 첫 번째 환자로 한 단계씩 직접 계산해 줘. 모델이 낸 확률과 같은지도 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "로지스틱 회귀가 시험용 데이터의 첫 번째 환자 한 명으로 확률을 계산하는 과정을 단계별로 따라가며, 모델이 낸 확률과 같은지 확인합니다.\n1. 열마다 값을 표준화합니다. 열의 평균을 빼고 표준편차로 나눠 단위를 맞춥니다.\n2. 표준화한 값에 열마다 계수를 곱해 모두 더하고 절편을 더해 점수를 만듭니다.\n3. 점수를 S자 곡선 식 1 ÷ (1 + e^(−점수))에 넣어 0과 1 사이 확률로 바꿉니다.\n\n확률이 판정 기준 0.5 이상이면 \"있음\"으로 예측하며, 이 과정을 따라 계산하는 코드입니다.",
+   "code": "import numpy as np\n\nscaler = model.named_steps[\"standardscaler\"]\nlr = model.named_steps[\"logisticregression\"]\n\nperson = X_test[y_test == 1].iloc[[0]]   # 시험용 데이터의 첫 번째 환자\nx = scaler.transform(person)[0]          # ① 열마다 표준화한 값\nparts = pd.DataFrame({\"열\": X_test.columns, \"원래 값\": person.iloc[0].values,\n                      \"표준화한 값\": x, \"계수\": lr.coef_[0], \"계수×값\": lr.coef_[0] * x}).round(3)\nst.dataframe(parts.sort_values(\"계수×값\", ascending=False).head(5), hide_index=True)\n\nscore = lr.intercept_[0] + (lr.coef_[0] * x).sum()   # ② 절편 + 계수×값 16개의 합\nprob = 1 / (1 + np.exp(-score))                      # ③ 점수를 0~1 사이 확률로\nst.write(\"절편:\", round(lr.intercept_[0], 3), \"| 계수×값의 합:\", round((lr.coef_[0] * x).sum(), 3), \"| 점수:\", round(score, 3))\nst.write(\"직접 계산한 확률:\", round(prob, 3), \"| 모델이 낸 확률:\", round(model.predict_proba(person)[0, 1], 3))\nst.write(\"판정 기준 0.5와 비교한 예측:\", \"있음\" if prob >= 0.5 else \"없음\")",
+   "after": "계수×값이 가장 큰 열은 age(2.682)이고 다음은 avg_glucose_level(0.424)입니다. 절편 −1.264에 계수×값 16개의 합 2.943을 더하면 점수는 1.679입니다. 이 점수를 S자 곡선 식에 넣은 확률 0.843은 모델이 낸 확률과 같고, 0.5 이상이라 \"있음\"으로 예측합니다. 이 환자의 확률을 높인 것은 대부분 나이입니다."
+  },
+  {
+   "who": "student",
+   "text": "점수를 확률로 바꾸는 S자 곡선을 그래프로 보여 주고, 첫 번째 환자가 곡선의 어디에 있는지 표시해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "점수가 −6부터 6까지일 때의 확률을 곡선으로 그리고 첫 번째 환자를 점으로 표시하는 코드입니다.",
+   "code": "curve = pd.DataFrame({\"점수\": [i / 10 for i in range(-60, 61)]})\ncurve[\"확률\"] = 1 / (1 + np.exp(-curve[\"점수\"]))\nfig = px.line(curve, x=\"점수\", y=\"확률\")\nfig.add_scatter(x=[score], y=[prob], mode=\"markers\", marker_size=12, name=\"첫 번째 환자\")\nst.plotly_chart(fig)",
+   "after": "점수가 0이면 확률은 0.5입니다. 점수가 클수록 확률은 1에, 작을수록 0에 가까워지지만 1을 넘거나 0보다 작아지지 않습니다. 곡선은 가운데서 가파르고 양 끝에서 평평합니다. 첫 번째 환자는 점수 1.679, 확률 0.843 위치에 있습니다."
+  },
+  {
+   "who": "student",
+   "text": "age의 계수 1.855는 무슨 뜻이야?"
+  },
+  {
+   "who": "ai",
+   "text": "age의 계수 1.855는 나이가 한 살 많아질 때마다 뇌졸중 확률이 1.855%p씩 오른다는 뜻입니다. 예를 들어 나이가 10살 많으면 확률이 약 18.6%p 높아집니다.",
+   "flag": "wrong"
+  },
+  {
+   "who": "check",
+   "text": "앞에서 점수를 S자 곡선으로 바꿔 확률을 만든다고 했으니, 확률이 언제나 같은 만큼 오르지는 않을 것 같아. 어린이 한 명과 첫 번째 환자의 나이를 한 살씩 늘려서 점수와 확률이 실제로 얼마나 바뀌는지 계산해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "두 사람의 나이를 한 살씩 늘려 점수와 확률의 변화를 계산하는 코드입니다.",
+   "code": "age_sd = scaler.scale_[list(X_test.columns).index(\"age\")]\nst.write(\"나이의 표준편차:\", round(age_sd, 1), \"세\")\n\nchild = X_test[X_test[\"age\"] < 10].iloc[[0]]\nfor name, who in [(\"어린이\", child), (\"첫 번째 환자\", person)]:\n    older = who.copy()\n    older[\"age\"] = older[\"age\"] + 1\n    s0, s1 = model.decision_function(who)[0], model.decision_function(older)[0]\n    p0, p1 = model.predict_proba(who)[0, 1], model.predict_proba(older)[0, 1]\n    st.write(name, \"| 나이\", who[\"age\"].iloc[0], \"→\", older[\"age\"].iloc[0], \"| 점수 변화\", round(s1 - s0, 3),\n             \"| 확률\", round(p0, 3), \"→\", round(p1, 3), \"(\", round((p1 - p0) * 100, 2), \"%p )\")",
+   "after": "앞의 설명이 틀렸습니다. 나이를 한 살 늘리면 두 사람 모두 점수가 0.082 오르지만, 확률은 어린이(3세)가 0.18%p, 첫 번째 환자(76세)가 1.06%p 올라 사람마다 다릅니다. 계수는 확률이 아니라 점수에 더해지는 값이고, 점수가 S자 곡선을 지나 확률이 되므로 곡선의 어느 위치에 있느냐에 따라 확률이 바뀌는 크기가 달라집니다. 또 나이는 표준화한 값으로 계산하므로, 1.855는 나이가 표준편차인 22.6세만큼 많아질 때 점수가 오르는 크기입니다. 한 살이면 1.855 ÷ 22.6, 약 0.082입니다. 계수로는 열의 값이 커질 때 확률이 오르는 방향인지 내리는 방향인지, 표준화한 열끼리 비교해 어느 열이 더 크게 작용하는지를 읽습니다."
+  },
+  {
+   "who": "note",
+   "title": "검증 기록 남기기",
+   "text": "계수를 확률의 변화로 읽은 설명을 직접 계산해 확인하고 바로잡은 과정을 log에 남깁니다.\n\n```text\n## 20211 박서연\n- 오늘 결정한 것: README의 모델 설명에 age의 계수를 나이가 22.6세 많아질 때 점수가 1.855 오른다고 쓰고, 확률이 오르는 크기는 사람마다 다르다고 적기로 함\n- AI에게 보낸 프롬프트(원문): 앞에서 점수를 S자 곡선으로 바꿔 확률을 만든다고 했으니, 확률이 언제나 같은 만큼 오르지는 않을 것 같아. 어린이 한 명과 첫 번째 환자의 나이를 한 살씩 늘려서 점수와 확률이 실제로 얼마나 바뀌는지 계산해 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: AI는 나이가 한 살 많아질 때마다 확률이 1.855%p씩 오른다고 했지만, 직접 계산해 보니 점수는 0.082씩 오르고 확률은 어린이 0.18%p, 첫 번째 환자 1.06%p로 달라서 그 설명을 버림\n- 느낀 점: 계수는 확률이 아니라 점수에 더해지는 값이라는 것을 직접 계산해 보고 알게 되었다\n```"
+  },
+  {
+   "who": "student",
+   "text": "후보였던 결정 트리와 랜덤 포레스트는 같은 첫 번째 환자를 어떻게 예측했는지 보여 줘. 결정 트리는 이 환자가 거친 질문을 차례로, 랜덤 포레스트는 나무들이 낸 확률을 보여 줘. 로지스틱 회귀와 무엇이 다른지도 알려 줘."
+  },
+  {
+   "who": "ai",
+   "text": "결정 트리에서는 이 환자가 거친 질문을 차례로, 랜덤 포레스트에서는 나무 100그루가 낸 확률을 보여 주는 코드입니다.",
+   "code": "tree = weighted[\"결정 트리\"]\nst.markdown(\"**결정 트리: 이 환자가 거친 질문**\")\nfeature, threshold = tree.tree_.feature, tree.tree_.threshold\nfor node in tree.decision_path(person).indices[:-1]:\n    col = X_test.columns[feature[node]]\n    value = person.iloc[0][col]\n    st.write(col, \"≤\", round(threshold[node], 2), \"인가? →\", \"예\" if value <= threshold[node] else \"아니요\", \"(이 환자:\", value, \")\")\nst.write(\"결정 트리가 낸 확률:\", round(tree.predict_proba(person)[0, 1], 3))\n\nforest = weighted[\"랜덤 포레스트\"]\nst.markdown(\"**랜덤 포레스트: 나무마다 낸 확률**\")\nprobs = [t.predict_proba(person.to_numpy())[0, 1] for t in forest.estimators_]\nst.write(\"나무:\", len(probs), \"그루 | 확률이 0.5 이상인 나무:\", sum(p >= 0.5 for p in probs), \"그루\")\nst.write(\"나무 100그루 확률의 평균:\", round(sum(probs) / len(probs), 3),\n         \"| 랜덤 포레스트가 낸 확률:\", round(forest.predict_proba(person)[0, 1], 3))\nst.write(\"로지스틱 회귀가 낸 확률:\", round(prob, 3))",
+   "after": "결정 트리는 다섯 질문을 거쳐 도착한 칸의 확률 0.851을 냈습니다. 다섯 질문은 age ≤ 47.5인가(아니요), age ≤ 67.5인가(아니요), bmi_missing ≤ 0.5인가(예, bmi가 비어 있지 않음), avg_glucose_level ≤ 129.35인가(아니요), bmi ≤ 22.15인가(아니요)입니다. 랜덤 포레스트는 나무 100그루 가운데 92그루가 0.5 이상을 냈고, 100그루 확률의 평균 0.705가 랜덤 포레스트의 확률입니다. 로지스틱 회귀(0.843)는 열 16개의 영향을 모두 점수 하나로 더하고, 결정 트리는 이 환자가 거친 질문의 열만 사용하며, 랜덤 포레스트는 여러 나무의 확률을 평균하므로, 세 모델 모두 \"있음\"으로 예측했지만 확률을 만드는 방법이 다릅니다."
+  },
+  {
+   "who": "student",
+   "text": "점수가 가장 높은 모델을 고르지 않아도 돼? F1은 결정 트리가, 재현율은 랜덤 포레스트가 더 높았잖아. 세 모델이 시험용 환자 50명 가운데 몇 명을 찾고 놓쳤는지, 잘못 울린 경보는 몇 번인지 비교해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "세 모델이 찾은 환자, 놓친 환자, 잘못 울린 경보를 비교하는 코드입니다.",
+   "code": "from sklearn.metrics import confusion_matrix, f1_score\n\nrows = []\nfor name, m in weighted.items():\n    p = m.predict(X_test)\n    tn, fp, fn, tp = confusion_matrix(y_test, p).ravel()\n    rows.append([name, tp, fn, fp, round(f1_score(y_test, p), 3)])\nst.dataframe(pd.DataFrame(rows, columns=[\"모델\", \"찾은 환자\", \"놓친 환자\", \"잘못 울린 경보\", \"F1\"]), hide_index=True)",
+   "after": "로지스틱 회귀는 40명을 찾고 경보를 242번 잘못 울렸습니다. 랜덤 포레스트는 41명으로 한 명 더 찾았지만 잘못 울린 경보가 316번으로 74번 많습니다. 결정 트리는 F1이 0.255로 가장 높지만 36명을 찾아 로지스틱 회귀보다 4명을 더 놓쳤습니다. 시험용 환자가 50명뿐이라 이 정도 차이로 어느 모델이 확실히 낫다고 말하기 어렵습니다. 이럴 때는 점수 외에 예측 이유를 설명할 수 있는지, 판정 기준을 조절할 수 있는지도 기준이 되며, 고른 이유를 log와 README에 남깁니다."
+  },
+  {
+   "who": "student",
+   "text": "구술 인터뷰에서 설명할 수 있게 내가 이해한 대로 말해 볼게. 틀린 곳이나 빠진 것을 알려 줘.\n\n로지스틱 회귀는 열마다 값을 표준화하고 계수를 곱해 더한 점수를 S자 곡선으로 0과 1 사이 확률로 바꿔. 확률이 0.5 이상이면 \"있음\"으로 예측해. 계수가 큰 열일수록 점수를 크게 올리는데, 우리 모델에서는 나이가 가장 커. 재현율이 랜덤 포레스트와 한 명 차이라서 로지스틱 회귀를 골랐어."
+  },
+  {
+   "who": "ai",
+   "text": "설명한 원리는 맞습니다.\n- **많이 사용되는 경우**: 질병 위험, 대출 연체처럼 \"있음/없음\"의 확률과 그 근거를 함께 설명해야 하는 분야에서 많이 사용됩니다.\n- **이 문제에 맞는 이유**: 예측할 값이 뇌졸중 있음과 없음 두 가지이고 환자를 놓치지 않는 것이 중요하므로, 확률을 내는 모델이라 판정 기준을 조절해 재현율을 지킬 수 있습니다. 계수로 나이, 고혈압, 평균 혈당 같은 열이 위험을 높이는 방향인지 설명할 수 있습니다.\n- **점수 외의 판단과 후보 모델과의 차이**: 랜덤 포레스트는 한 명을 더 찾았지만 경보를 74번 더 잘못 울렸고, 나무 100그루의 평균이라 예측 이유를 한눈에 설명하기 어렵습니다. 결정 트리는 질문 순서로 설명할 수 있지만 환자를 4명 더 놓쳤습니다.\n\n이 내용을 더하면 원리, 많이 사용되는 경우, 고른 이유, 후보 모델과의 차이를 모두 설명할 수 있습니다."
+  },
+  {
+   "who": "note",
+   "title": "모델 비교 정리",
+   "text": "세 모델이 같은 환자의 확률을 만든 방법과 결과를 한 표로 정리해 README의 방법 절에 옮깁니다.\n\n| 항목 | 로지스틱 회귀(최종 모델) | 결정 트리 | 랜덤 포레스트 |\n|---|---|---|---|\n| 확률을 만드는 방법 | 계수×값을 더한 점수를 S자 곡선으로 확률로 바꿈 | 예/아니요 질문을 따라 도착한 칸의 환자 비율(가중치 반영) | 나무 100그루가 낸 확률의 평균 |\n| 첫 번째 환자의 확률 | 0.843 | 0.851 | 0.705 |\n| 재현율 · F1 | 0.80 · 0.241 | 0.72 · 0.255 | 0.82 · 0.201 |\n| 찾은 환자 · 잘못 울린 경보(시험용 환자 50명) | 40명 · 242번 | 36명 · 196번 | 41명 · 316번 |\n| 예측 이유 설명 | 열마다 계수로 설명 | 질문 순서로 설명 | 한눈에 설명하기 어려움 |"
+  },
+  {
+   "who": "note",
+   "title": "구술 인터뷰 대비: 선정한 모델",
+   "text": "선정한 모델에 대한 질문은 구술 인터뷰 ③과 포스터 문답에서 팀원마다 묻습니다. 아래 예시 답은 이 대화에서 확인한 내용으로 만든 것이며, 자기 팀의 모델과 수치로 바꿔 답합니다.\n\n**③ 질문** (팀원마다) 선정한 모델은 어떤 특징이 있고, 어떤 경우에 많이 사용됩니까?\n\n> 예시 답: 로지스틱 회귀는 확률을 내고, 계수로 각 열이 확률을 올리는 방향인지 내리는 방향인지 읽을 수 있습니다. 그래서 질병 위험이나 대출 연체처럼 \"있음/없음\"의 확률과 그 근거를 함께 설명해야 하는 분야에서 많이 사용됩니다.\n\n**③ 질문** (팀원마다) 왜 이 문제를 푸는 데 이 모델이 적합합니까?\n\n> 예시 답: 예측할 값이 뇌졸중 있음과 없음 두 가지이고 환자를 놓치지 않는 것이 중요합니다. 로지스틱 회귀는 확률을 내므로 판정 기준을 조절해 재현율을 지킬 수 있고, 나이, 고혈압, 평균 혈당 같은 열이 위험을 높이는 방향인지 계수로 설명할 수 있습니다.\n\n**③ 질문** 점수가 가장 높은 모델이 아닌 다른 모델을 고른다면 그 이유는 무엇입니까?\n\n> 예시 답: F1은 결정 트리, 재현율은 랜덤 포레스트가 가장 높았지만 시험용 환자가 50명이라 차이는 환자 한두 명입니다. 랜덤 포레스트는 한 명을 더 찾는 대신 잘못 울린 경보가 74번 많았고, 결정 트리는 환자를 4명 더 놓쳤습니다. 그래서 예측 이유를 계수로 설명할 수 있는 로지스틱 회귀를 골랐습니다.\n\n**포스터 문답 질문** (팀원 모두) 선택한 모델은 어떤 원리로 예측합니까? 왜 이 모델을 골랐습니까?\n\n> 예시 답: 로지스틱 회귀는 열마다 값을 표준화하고 계수를 곱해 더한 뒤 절편을 더해 점수를 만들고, 이 점수를 S자 곡선으로 0과 1 사이 확률로 바꿉니다. 확률이 0.5 이상이면 \"있음\"으로 예측합니다. 첫 번째 환자는 점수 1.679, 확률 0.843이었고 나이가 점수를 2.682만큼 올려 가장 크게 작용했으며, 고른 이유는 위의 두 답과 같습니다.\n\n**포스터 문답 질문** (팀원 모두) 비교한 후보 모델 하나는 어떤 원리이고, 선택한 모델과 무엇이 다릅니까?\n\n> 예시 답: 랜덤 포레스트는 데이터와 열을 무작위로 바꿔 가며 만든 결정 트리 100그루의 확률을 평균합니다. 첫 번째 환자는 100그루 가운데 92그루가 0.5 이상을 냈고 평균은 0.705였습니다. 모든 열의 영향을 점수 하나로 더해 계수로 설명할 수 있는 로지스틱 회귀와 달리, 나무가 많아 예측 이유를 한눈에 설명하기 어렵습니다."
+  }
+ ],
+ "summary": "모델 설명과 후보 모델과의 차이를 README의 방법 절에 옮깁니다. 다음 페이지(해석·한계)에서는 계수 전체를 그래프로 보고, 데이터에서 찾아낸 것과 결과를 믿기 어려운 이유를 정리합니다."
+}
