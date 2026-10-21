@@ -11,12 +11,16 @@
     {"who": "student", "text": "학생이 AI에게 보낸 말"},
     {"who": "ai", "text": "AI의 답", "code": "실행할 코드(선택)", "after": "결과를 본 뒤 AI의 설명(선택)", "flag": "wrong(선택, 틀린 제안: 화면에는 표시하지 않음)"},
     {"who": "check", "text": "학생이 직접 확인한 것(검증)"},
-    {"who": "note", "title": "제목", "text": "정리 카드"}
+    {"who": "note", "title": "제목", "text": "정리 카드"},
+    {"who": "oral", "title": "구술 인터뷰 대비: ...", "text": "안내", "checklist": "c3(선택, 그 회차의 준비 체크리스트)",
+     "qa": [{"cp": "c3", "q": "opener 또는 꼬리질문 번호(0부터)", "label": "③ 질문", "asked": "예시 답을 쓸 때의 질문", "a": "예시 답"}]}
   ],
   "summary": "마무리 글(마크다운)",
   "setup": "페이지를 열 때 조용히 실행할 코드(선택, 앞 페이지에서 이어지는 df 등)", "setup_note": "그 안내 한 줄(선택)"
 }
 단계 사이에 이어지는 변수(df, df_prep 등)는 앞 단계의 코드를 차례로 다시 실행해 만든다.
+구술 인터뷰 대비 카드(who: oral)의 질문과 체크리스트는 content/oral.json에서 읽는다. 이 파일은 2026-ds-danggok의
+구술평가_루브릭.json에서 scripts/build_oral.py가 만든다. 루브릭의 질문을 고치면 카드도 함께 바뀐다.
 """
 import builtins
 import json
@@ -76,6 +80,33 @@ def md(text):
     st.markdown('\n'.join(out))
 
 
+def _oral_checkpoints():
+    p = ROOT / 'content' / 'oral.json'
+    if not p.exists():
+        return {}
+    return {c['id']: c for c in json.loads(p.read_text(encoding='utf-8'))['checkpoints']}
+
+
+def _oral_card(s):
+    """구술 인터뷰 대비 카드: 질문은 루브릭(oral.json)에서, 예시 답은 시나리오에서"""
+    cps = _oral_checkpoints()
+    with st.container(border=True):
+        if s.get('title'):
+            md('#### ' + s['title'])
+        if s.get('text'):
+            md(s['text'])
+        for qa in s.get('qa', []):
+            c = cps.get(qa['cp'], {})
+            fu = c.get('followups', [])
+            q = c.get('opener') if qa['q'] == 'opener' else (fu[qa['q']] if isinstance(qa['q'], int) and qa['q'] < len(fu) else None)
+            md('**%s** %s' % (qa.get('label', ''), q or qa.get('asked', '')))
+            md('> 예시 답: ' + qa['a'])
+        if s.get('checklist') in cps:
+            c = cps[s['checklist']]
+            with st.expander('%s %s 준비 체크리스트(구술 평가 안내와 같은 목록)' % (c['no'], c['title'])):
+                md('\n'.join('- ' + x for x in c['checklist']))
+
+
 def load_scenario(name):
     return json.loads((ROOT / 'content' / (name + '.json')).read_text(encoding='utf-8'))
 
@@ -132,6 +163,9 @@ def run_chat(name):
             st.caption(sc['setup_note'])
     for i, s in enumerate(steps[:upto]):
         who = s['who']
+        if who == 'oral':
+            _oral_card(s)
+            continue
         if who == 'note':
             with st.container(border=True):
                 if s.get('title'):
@@ -156,7 +190,7 @@ def run_chat(name):
     if not show_all and st.session_state[key] < len(steps):
         nxt = steps[st.session_state[key]]
         label = {'student': '다음: 학생이 묻기', 'ai': '다음: AI가 답하기', 'check': '다음: 직접 확인하기',
-                 'note': '다음: 정리하기'}.get(nxt['who'], '다음')
+                 'note': '다음: 정리하기', 'oral': '다음: 구술 인터뷰 대비'}.get(nxt['who'], '다음')
         if st.button(label + ' ▶', type='primary', key='next_' + name, width='stretch'):
             st.session_state[key] += 1
             st.rerun()
