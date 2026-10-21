@@ -111,10 +111,13 @@ def load_scenario(name):
     return json.loads((ROOT / 'content' / (name + '.json')).read_text(encoding='utf-8'))
 
 
+_RUNTIME = {'pd': _PD, 'np': np, 'px': px, 'st': st}   # 코드가 쓰는 실행 환경(준비 캐시에 넣지 않는다)
+
+
 def _namespace():
     b = dict(builtins.__dict__)
     b['__import__'] = _import
-    return {'__builtins__': b, 'pd': _PD, 'np': np, 'px': px, 'st': st}
+    return {'__builtins__': b, **_RUNTIME}
 
 
 @st.cache_resource(show_spinner='앞 단계의 결과를 준비하는 중…')
@@ -123,7 +126,8 @@ def _setup_cached(code):
     결과(데이터·모델)는 모든 사용자가 함께 쓰므로, 단계 코드에서 제자리 수정(inplace)을 하지 않는다."""
     ns = _namespace()
     exec(compile(code, '<준비>', 'exec'), ns)
-    return {k: v for k, v in ns.items() if not k.startswith('__')}
+    # 데이터·모델만 남긴다. 실행 환경까지 캐시하면 진행기가 바뀐 뒤에도 옛 환경이 되살아난다
+    return {k: v for k, v in ns.items() if not k.startswith('__') and k not in _RUNTIME}
 
 
 def _run_code(code, ns, idx):
