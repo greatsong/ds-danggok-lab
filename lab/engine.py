@@ -60,6 +60,22 @@ def _import(name, globals=None, locals=None, fromlist=(), level=0):
     return _real_import(name, globals, locals, fromlist, level)
 
 
+def md(text):
+    """마크다운으로 그리되, 코드 바깥의 물결표(~)는 그대로 보이게 한다(77~114가 취소선이 되지 않게)."""
+    out, in_block = [], False
+    for line in str(text).split('\n'):
+        if line.strip().startswith('```'):
+            in_block = not in_block
+            out.append(line)
+            continue
+        if in_block:
+            out.append(line)
+            continue
+        parts = line.split('`')
+        out.append('`'.join(x if i % 2 else x.replace('~', '\\~') for i, x in enumerate(parts)))
+    st.markdown('\n'.join(out))
+
+
 def load_scenario(name):
     return json.loads((ROOT / 'content' / (name + '.json')).read_text(encoding='utf-8'))
 
@@ -68,6 +84,15 @@ def _namespace():
     b = dict(builtins.__dict__)
     b['__import__'] = _import
     return {'__builtins__': b, 'pd': _PD, 'np': np, 'px': px, 'st': st}
+
+
+@st.cache_resource(show_spinner='앞 단계의 결과를 준비하는 중…')
+def _setup_cached(code):
+    """앞 페이지에서 이어지는 준비 코드는 한 번만 실행한다(모델 학습 포함).
+    결과(데이터·모델)는 모든 사용자가 함께 쓰므로, 단계 코드에서 제자리 수정(inplace)을 하지 않는다."""
+    ns = _namespace()
+    exec(compile(code, '<준비>', 'exec'), ns)
+    return {k: v for k, v in ns.items() if not k.startswith('__')}
 
 
 def _run_code(code, ns, idx):
@@ -88,7 +113,7 @@ def run_chat(name):
 
     st.title(sc['title'])
     if sc.get('intro'):
-        st.markdown(sc['intro'])
+        md(sc['intro'])
 
     with st.sidebar:
         st.markdown('### 진행')
@@ -102,7 +127,7 @@ def run_chat(name):
     upto = len(steps) if show_all else st.session_state[key]
     ns = _namespace()
     if sc.get('setup'):
-        exec(compile(sc['setup'], '<준비>', 'exec'), ns)
+        ns.update(_setup_cached(sc['setup']))
         if sc.get('setup_note'):
             st.caption(sc['setup_note'])
     for i, s in enumerate(steps[:upto]):
@@ -110,23 +135,23 @@ def run_chat(name):
         if who == 'note':
             with st.container(border=True):
                 if s.get('title'):
-                    st.markdown('#### ' + s['title'])
-                st.markdown(s['text'])
+                    md('#### ' + s['title'])
+                md(s['text'])
             continue
         if who == 'check':
             with st.chat_message('user', avatar='🔎'):
                 st.markdown('**학생 · 직접 확인하기**')
-                st.markdown(s['text'])
+                md(s['text'])
             continue
         role = 'user' if who == 'student' else 'assistant'
         with st.chat_message(role, avatar='🧑‍🎓' if role == 'user' else '🤖'):
             st.markdown('**학생**' if role == 'user' else '**AI**')
-            st.markdown(s['text'])
+            md(s['text'])
             if s.get('code'):
                 st.code(s['code'], language='python')
                 _run_code(s['code'], ns, i)
             if s.get('after'):
-                st.markdown(s['after'])
+                md(s['after'])
 
     if not show_all and st.session_state[key] < len(steps):
         nxt = steps[st.session_state[key]]
@@ -137,5 +162,5 @@ def run_chat(name):
             st.rerun()
     elif sc.get('summary'):
         st.divider()
-        st.markdown(sc['summary'])
+        md(sc['summary'])
     return ns

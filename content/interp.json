@@ -1,0 +1,85 @@
+{
+ "title": "해석·한계",
+ "intro": "이 페이지에서는 최종 모델, 즉 가중치를 켠 로지스틱 회귀가 어떤 열을 근거로 뇌졸중을 예측했는지 살펴봅니다. 그리고 데이터에서 찾아낸 내용을 인사이트로 정리합니다. 이 결과를 믿기 어려운 이유도 수치로 정리합니다. 구술 인터뷰 ⑤의 시작 질문인 찾아낸 것 하나와 믿기 어려운 이유 하나에 답할 재료가 여기서 나옵니다.",
+ "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nweighted = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=\"balanced\")),\n    \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n}\nfor m in weighted.values():\n    m.fit(X_train, y_train)\nplain = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X_train, y_train)\nmodel = weighted[\"로지스틱 회귀\"]",
+ "setup_note": "이 페이지는 평가지표·결과 페이지에서 고른 최종 모델(가중치를 켠 로지스틱 회귀)에서 이어집니다.",
+ "steps": [
+  {
+   "who": "student",
+   "text": "최종 모델에서 어떤 열이 뇌졸중 예측에 크게 작용했는지 계수를 막대그래프로 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "로지스틱 회귀의 계수를 크기 순으로 그리는 코드입니다. 열을 표준화했으므로 계수의 크기를 서로 비교할 수 있습니다.",
+   "code": "lr = model.named_steps[\"logisticregression\"]\ncoef = pd.Series(lr.coef_[0], index=X_train.columns).sort_values()\nfig = px.bar(x=coef.values, y=coef.index, orientation=\"h\",\n             labels={\"x\": \"계수(표준화한 열 기준)\", \"y\": \"열\"})\nst.plotly_chart(fig)",
+   "after": "age의 계수가 1.855로 다른 열보다 훨씬 큽니다. 그다음은 work_type_children이 0.38, bmi_missing이 0.341, hypertension이 0.207, avg_glucose_level이 0.187 순입니다. bmi_missing이 양수인 것은 bmi가 비어 있던 사람 가운데 환자가 많았던 것과 같은 방향입니다. work_type_children처럼 나이와 겹치는 열은 계수 하나만 떼어 해석하면 잘못 읽을 수 있으므로, 실제 비율로 다시 확인합니다."
+  },
+  {
+   "who": "student",
+   "text": "나이대별 사람 수와 뇌졸중 비율을 표로 보여 줘. 나이대는 0~19세, 20~39세, 40~59세, 60~79세, 80세 이상으로 나눠 줘."
+  },
+  {
+   "who": "ai",
+   "text": "나이를 구간으로 나누어 구간마다 사람 수와 뇌졸중 비율을 세는 코드입니다.",
+   "code": "view = df_prep.assign(나이대=pd.cut(df_prep[\"age\"], bins=[0, 20, 40, 60, 80, 100], right=False,\n                                labels=[\"0~19세\", \"20~39세\", \"40~59세\", \"60~79세\", \"80세 이상\"]))\nrate = view.groupby(\"나이대\", observed=True)[\"stroke\"].agg([\"count\", \"mean\"])\nrate[\"뇌졸중 비율(%)\"] = (rate[\"mean\"] * 100).round(1)\nst.dataframe(rate[[\"count\", \"뇌졸중 비율(%)\"]].rename(columns={\"count\": \"사람 수\"}))",
+   "after": "뇌졸중 비율은 40~59세 3.8%, 60~79세 11.8%, 80세 이상 21.5%로 나이가 많을수록 크게 올라갑니다. 0~19세는 0.2%, 20~39세는 0.5%입니다. 모델에서 age의 계수가 가장 컸던 것과 같은 결과입니다."
+  },
+  {
+   "who": "student",
+   "text": "흡연 상태별 뇌졸중 비율에서 Unknown이 가장 낮았는데, 흡연 정보가 없는 사람은 뇌졸중 위험이 낮다고 해석해도 되는지 궁금해. 흡연 상태별 비율을 다시 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "흡연 상태별 뇌졸중 비율을 보여 주는 코드입니다.",
+   "code": "rate = df_prep.groupby(\"smoking_status\")[\"stroke\"].mean().mul(100).round(1)\nst.write(rate.rename(\"뇌졸중 비율(%)\"))",
+   "after": "Unknown의 뇌졸중 비율이 3.0%로 가장 낮습니다. 흡연 정보가 없는 사람은 뇌졸중 위험이 낮다고 해석할 수 있습니다.",
+   "flag": "wrong"
+  },
+  {
+   "who": "check",
+   "text": "Unknown에는 어린이가 많았잖아. 나이대를 맞춰서 흡연 상태별 뇌졸중 비율을 다시 비교해 줘. 나이대별 Unknown 인원도 함께 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "나이대와 흡연 상태를 함께 나누어 비율을 비교하는 코드입니다.",
+   "code": "table = (view.groupby([\"나이대\", \"smoking_status\"], observed=True)[\"stroke\"].mean()\n         .mul(100).round(1).unstack())\nst.dataframe(table)\nst.write(\"나이대별 Unknown 인원:\", view[view[\"smoking_status\"] == \"Unknown\"][\"나이대\"].value_counts().sort_index().to_dict())",
+   "after": "앞의 해석이 틀렸습니다. Unknown 1,544명 가운데 731명이 0~19세라서 전체 비율이 낮게 나온 것입니다. 나이대를 맞추면 Unknown의 비율은 다른 흡연 상태와 비슷합니다. 예를 들어 40~59세는 4.6%, 60~79세는 11.1%입니다. 이처럼 두 값 사이의 관계가 제3의 값, 여기서는 나이 때문에 생긴 것처럼 보일 수 있으므로, 비율을 비교할 때는 나이 같은 조건을 맞춰 다시 확인합니다."
+  },
+  {
+   "who": "note",
+   "title": "검증 기록 남기기",
+   "text": "겉으로 보이는 비율을 나이대를 맞춰 다시 확인한 과정을 log에 남깁니다.\n\n```text\n## 20203 김도윤\n- 오늘 결정한 것: 흡연 Unknown에 대한 해석은 나이대를 맞춘 비교로 쓰기로 함\n- AI에게 보낸 프롬프트(원문): Unknown에는 어린이가 많았잖아. 나이대를 맞춰서 흡연 상태별 뇌졸중 비율을 다시 비교해 줘. 나이대별 Unknown 인원도 함께 보여 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: AI는 Unknown이면 뇌졸중 위험이 낮다고 해석했지만, 나이대를 맞추니 다른 흡연 상태와 비슷해서 그 해석을 버림\n- 느낀 점: 전체 비율만 보면 나이 때문에 생긴 차이를 흡연 때문이라고 읽을 수 있다는 것을 알았음\n```"
+  },
+  {
+   "who": "student",
+   "text": "인사이트를 더 찾고 싶어. 평균 혈당 구간별과 고혈압 여부별 뇌졸중 비율을 보여 줘. 혈당 구간은 100 미만, 100~149, 150 이상으로 나눠 줘."
+  },
+  {
+   "who": "ai",
+   "text": "혈당 구간과 고혈압 여부로 나누어 뇌졸중 비율을 세는 코드입니다.",
+   "code": "glucose = pd.cut(df_prep[\"avg_glucose_level\"], bins=[0, 100, 150, 300], right=False,\n                 labels=[\"100 미만\", \"100~149\", \"150 이상\"])\nst.write(df_prep.groupby(glucose, observed=True)[\"stroke\"].mean().mul(100).round(1).rename(\"혈당 구간별 뇌졸중 비율(%)\"))\nst.write(df_prep.groupby(\"hypertension\")[\"stroke\"].mean().mul(100).round(1).rename(\"고혈압(0, 1)별 뇌졸중 비율(%)\"))",
+   "after": "평균 혈당이 150 이상인 사람의 뇌졸중 비율은 12.3%로, 100 미만 3.6%와 100~149 3.8%보다 세 배 이상 높습니다. 100 미만과 100~149는 거의 차이가 없습니다. 고혈압이 있는 사람은 13.3%, 없는 사람은 4.0%입니다."
+  },
+  {
+   "who": "note",
+   "title": "인사이트 세 가지",
+   "text": "찾아낸 것을 헤드라인, 근거 수치, 뜻, 상식과 다른 점 순서로 정리합니다.\n\n**1.**\n\n- 헤드라인: 60세가 넘으면 뇌졸중 비율이 크게 오른다\n- 근거 수치: 40~59세 3.8%, 60~79세 11.8%, 80세 이상 21.5%, 모델 계수도 age가 1.855로 가장 큼\n- 뜻: 이 데이터에서 나이가 가장 큰 요인이다\n- 상식과 다른 점: 상식과 같은 결과이며, 다른 요인을 볼 때는 나이를 맞춰서 봐야 한다\n\n**2.**\n\n- 헤드라인: 평균 혈당은 150을 넘을 때 뇌졸중 비율이 뛴다\n- 근거 수치: 150 이상 12.3%, 100 미만 3.6%, 100~149 3.8%\n- 뜻: 혈당이 높을수록 조금씩 오르는 것이 아니라 150 이상에서 크게 달라진다\n- 상식과 다른 점: 100~149 구간은 100 미만과 거의 차이가 없다\n\n**3.**\n\n- 헤드라인: 흡연 정보가 없는 사람의 낮은 뇌졸중 비율은 나이 때문이다\n- 근거 수치: 전체로는 Unknown 3.0%로 가장 낮지만 Unknown 1,544명 가운데 731명이 0~19세이고, 나이대를 맞추면 비슷하다(60~79세 11.1%)\n- 뜻: 흡연 정보가 없다고 위험이 낮은 것이 아니다\n- 상식과 다른 점: 전체 비율만 보면 반대로 해석하기 쉽다"
+  },
+  {
+   "who": "student",
+   "text": "이 결과를 믿기 어려운 이유를 수치로 정리하고 싶어. 시험용 환자 수가 결과에 주는 영향과 채운 값, Unknown이 얼마나 되는지 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "한계를 수치로 보여 주는 코드입니다.",
+   "code": "pos = y_test.sum()\nst.write(\"시험용 뇌졸중 환자:\", pos, \"명\")\nst.write(\"한 명을 더 찾거나 놓치면 재현율이\", round(1 / pos, 3), \"만큼 바뀝니다.\")\nst.write(\"bmi를 채운 사람:\", df_prep[\"bmi_missing\"].sum(), \"명 / 흡연 정보가 Unknown인 사람:\",\n         (df_prep[\"smoking_status\"] == \"Unknown\").sum(), \"명\")",
+   "after": "시험용 환자는 50명이라 한 명을 더 찾거나 놓치면 재현율이 0.02 바뀝니다. bmi를 채운 사람은 201명, 흡연 정보가 Unknown인 사람은 1,544명입니다."
+  },
+  {
+   "who": "note",
+   "title": "한계",
+   "text": "이 모델의 한계를 수치로 정리합니다.\n\n- 시험용 환자가 50명뿐이라 한 명이 재현율을 0.02씩 바꾸므로 모델 사이의 작은 차이는 믿기 어렵다\n- 데이터 출처가 공개되어 있지 않아(캐글 설명: Confidential Source, 교육용으로만 사용) 누가 언제 어디서 모은 데이터인지 알 수 없고, 다른 집단에 그대로 적용하기 어렵다\n- bmi 201명은 중앙값으로 채운 값이고 흡연 정보 1,544명은 알 수 없는 값이다\n- 한 시점의 기록이라 어떤 값이 먼저 생겼는지 알 수 없으므로, 관계가 있다는 것이 원인이라는 뜻은 아니다\n\n**잘못 쓰면 생길 수 있는 일**: 이 모델로 한 사람의 뇌졸중 위험을 진단하면 안 됩니다. 정밀도가 0.142라 \"있음\"으로 예측한 사람 대부분은 실제 환자가 아닙니다."
+  }
+ ],
+ "summary": "여기까지 정리한 인사이트와 한계를 포스터에 옮겨 질문부터 결론까지 설명합니다. 각 단계의 log 기록이 포스터 문답의 근거가 됩니다."
+}

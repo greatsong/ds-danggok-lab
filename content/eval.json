@@ -1,0 +1,80 @@
+{
+ "title": "평가지표·결과",
+ "intro": "이 페이지에서는 가중치를 켠 세 모델의 결과를 혼동행렬과 평가지표(정밀도, 재현율, F1)로 읽고 최종 모델을 고릅니다. 판정 기준을 바꿔 보며 그래프 하나를 해석합니다. 구술 인터뷰 ④의 시작 질문인 평가지표와 베이스라인으로 결과를 설명하고 그래프 하나를 골라 뜻을 말하는 데 필요한 재료가 여기서 나옵니다.",
+ "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nweighted = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=\"balanced\")),\n    \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n}\nfor m in weighted.values():\n    m.fit(X_train, y_train)\nplain = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X_train, y_train)",
+ "setup_note": "이 페이지는 모델 후보·베이스라인 페이지의 결과(나눈 데이터, 베이스라인, 가중치를 켠 세 모델)에서 이어집니다.",
+ "steps": [
+  {
+   "who": "student",
+   "text": "가중치를 켠 로지스틱 회귀의 결과를 혼동행렬 그림으로 보여 줘."
+  },
+  {
+   "who": "ai",
+   "text": "시험용 데이터의 예측을 혼동행렬로 그리는 코드입니다.",
+   "code": "from sklearn.metrics import confusion_matrix\n\nmodel = weighted[\"로지스틱 회귀\"]\npred = model.predict(X_test)\ncm = confusion_matrix(y_test, pred)\nfig = px.imshow(cm, text_auto=True, color_continuous_scale=\"Blues\",\n                x=[\"예측: 없음\", \"예측: 있음\"], y=[\"실제: 없음\", \"실제: 있음\"])\nst.plotly_chart(fig)",
+   "after": "- 실제 환자 50명 가운데 40명을 \"있음\"으로 맞혔습니다(TP 40).\n- 10명은 놓쳤습니다(FN 10).\n- 환자가 아닌 972명 가운데 242명을 \"있음\"으로 잘못 예측했습니다(FP 242).\n- 730명은 \"없음\"으로 맞혔습니다(TN 730)."
+  },
+  {
+   "who": "student",
+   "text": "정밀도와 재현율이 무엇인지 설명하고, 혼동행렬의 숫자로 직접 계산해 보여 줘. F1도."
+  },
+  {
+   "who": "ai",
+   "text": "정밀도는 \"있음\"으로 예측한 사람 가운데 실제 환자의 비율이고, 재현율은 실제 환자 가운데 모델이 찾아낸 비율입니다. F1은 둘을 함께 보는 값입니다. 혼동행렬 숫자로 계산하는 코드입니다.",
+   "code": "tn, fp, fn, tp = cm.ravel()\nst.write(\"정밀도 = TP / (TP + FP) =\", tp, \"/\", tp + fp, \"=\", round(tp / (tp + fp), 3))\nst.write(\"재현율 = TP / (TP + FN) =\", tp, \"/\", tp + fn, \"=\", round(tp / (tp + fn), 3))\nst.write(\"F1 =\", round(2 * tp / (2 * tp + fp + fn), 3))",
+   "after": "정밀도는 40/282 = 0.142, 재현율은 40/50 = 0.8, F1은 0.241입니다. 환자를 많이 찾는 대신 \"있음\" 경보 282번 가운데 242번은 잘못 울린 경보입니다."
+  },
+  {
+   "who": "student",
+   "text": "가중치를 켜니 정확도가 0.95에서 0.75로 떨어졌는데, 가중치를 끈 모델이 더 좋은 거 아니야? 두 모델의 정확도를 비교해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "두 모델의 정확도를 비교하는 코드입니다.",
+   "code": "for name, m in [(\"가중치 끔\", plain), (\"가중치 켬\", weighted[\"로지스틱 회귀\"])]:\n    st.write(\"로지스틱 회귀(\" + name + \") 정확도:\", round(accuracy_score(y_test, m.predict(X_test)), 3))",
+   "after": "가중치를 끈 모델의 정확도가 0.951로 훨씬 높습니다. 정확도가 높은 모델이 더 좋은 모델이므로 가중치를 끈 모델을 쓰면 됩니다.",
+   "flag": "wrong"
+  },
+  {
+   "who": "check",
+   "text": "정확도만 보지 말고, 두 모델이 시험용 환자 50명 가운데 몇 명을 찾고 몇 명을 놓쳤는지, 잘못 울린 경보는 몇 명인지 비교해 줘."
+  },
+  {
+   "who": "ai",
+   "text": "두 모델의 혼동행렬 숫자를 비교하는 코드입니다.",
+   "code": "for name, m in [(\"가중치 끔\", plain), (\"가중치 켬\", weighted[\"로지스틱 회귀\"])]:\n    tn, fp, fn, tp = confusion_matrix(y_test, m.predict(X_test)).ravel()\n    st.write(name, \"| 찾은 환자:\", tp, \"명 | 놓친 환자:\", fn, \"명 | 잘못 울린 경보:\", fp, \"명\")",
+   "after": "앞의 결론이 틀렸습니다. 가중치를 끈 모델은 환자 50명 가운데 1명만 찾고 49명을 놓쳤습니다. 정확도가 높은 까닭은 거의 모두를 \"없음\"으로 예측했기 때문이고, 베이스라인과 다를 바 없습니다. 뇌졸중처럼 놓치면 위험한 문제에서는 정확도보다 재현율과 F1을 먼저 봅니다."
+  },
+  {
+   "who": "note",
+   "title": "검증 기록 남기기",
+   "text": "정확도가 높으니 가중치를 끄자는 제안을 찾은 환자 수로 확인해 버린 과정을 log에 남깁니다.\n\n```text\n## 20219 이준호\n- 오늘 결정한 것: 가중치를 켠 모델을 쓰기로 함\n- AI에게 보낸 프롬프트(원문): 정확도만 보지 말고, 두 모델이 시험용 환자 50명 가운데 몇 명을 찾고 몇 명을 놓쳤는지, 잘못 울린 경보는 몇 명인지 비교해 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: AI는 정확도가 0.951로 높은 가중치 끈 모델을 쓰라고 했지만, 확인해 보니 환자 50명 가운데 1명만 찾아서 버림\n- 느낀 점: 정확도 하나만 보면 환자를 거의 못 찾는 모델을 고를 뻔했다.\n```"
+  },
+  {
+   "who": "student",
+   "text": "가중치를 켠 세 모델과 베이스라인을 정확도, 정밀도, 재현율, F1로 다시 비교하고, 최종 모델을 무엇으로 고르면 좋을지 기준과 함께 알려 줘."
+  },
+  {
+   "who": "ai",
+   "text": "비교표를 만드는 코드입니다.",
+   "code": "rows = [[\"베이스라인\", accuracy_score(y_test, baseline.predict(X_test)), 0.0, 0.0, 0.0]]\nfor name, m in weighted.items():\n    p = m.predict(X_test)\n    rows.append([name, accuracy_score(y_test, p), precision_score(y_test, p),\n                 recall_score(y_test, p), f1_score(y_test, p)])\nst.dataframe(pd.DataFrame(rows, columns=[\"모델\", \"정확도\", \"정밀도\", \"재현율\", \"F1\"]).round(3), hide_index=True)",
+   "after": "F1은 결정 트리가 0.255로 가장 높고, 재현율은 랜덤 포레스트가 0.82로 가장 높습니다. 로지스틱 회귀는 재현율 0.80, F1 0.241입니다. 그런데 시험용 환자가 50명뿐이라 환자 한 명을 더 찾으면 재현율이 0.02 바뀌므로, 세 모델의 차이는 한두 명 차이입니다. 이럴 때는 결과를 설명할 수 있는지도 기준이 됩니다. 로지스틱 회귀는 열마다 계수로 영향을 읽을 수 있어 최종 모델로 제안하며, 어떤 기준으로 고를지는 팀이 정하고 그 이유를 기록합니다."
+  },
+  {
+   "who": "student",
+   "text": "판정 기준(이 값 이상이면 \"있음\")을 슬라이더로 바꾸면서 정밀도, 재현율, F1이 어떻게 달라지는지 보여 줘. 기준에 따른 세 지표 변화를 선 그래프로도."
+  },
+  {
+   "who": "ai",
+   "text": "모델이 낸 확률에 판정 기준을 적용해 지표를 계산하고, 기준마다 세 지표를 선 그래프로 그리는 코드입니다.",
+   "code": "proba = model.predict_proba(X_test)[:, 1]\nth = st.slider(\"판정 기준(이 값 이상이면 '있음')\", 0.1, 0.9, 0.5, 0.05)\np = (proba >= th).astype(int)\nst.write(\"정밀도\", round(precision_score(y_test, p, zero_division=0), 3),\n         \"| 재현율\", round(recall_score(y_test, p), 3), \"| F1\", round(f1_score(y_test, p), 3))\n\nrows = []\nfor t in [i / 20 for i in range(2, 19)]:\n    q = (proba >= t).astype(int)\n    rows.append([t, precision_score(y_test, q, zero_division=0), recall_score(y_test, q), f1_score(y_test, q)])\ncurve = pd.DataFrame(rows, columns=[\"판정 기준\", \"정밀도\", \"재현율\", \"F1\"])\nst.plotly_chart(px.line(curve, x=\"판정 기준\", y=[\"정밀도\", \"재현율\", \"F1\"], markers=True,\n                        labels={\"value\": \"값\", \"variable\": \"지표\"}))",
+   "after": "판정 기준을 올리면 정밀도는 올라가고 재현율은 내려갑니다. F1은 기준 0.75에서 0.319로 가장 높지만, 이때 재현율은 0.60으로 환자 50명 가운데 30명만 찾습니다. 기준 0.5에서는 40명을 찾는 대신 잘못 울린 경보가 많습니다. 놓치면 위험한 검사라면 재현율을 지키는 낮은 기준을, 경보가 너무 많으면 곤란한 상황이라면 높은 기준을 고르며, 팀이 정한 기준과 이유를 기록합니다."
+  },
+  {
+   "who": "note",
+   "title": "결과 정리",
+   "text": "구술 인터뷰에서 결과를 설명할 때 쓸 수치를 한 표로 정리합니다.\n\n| 항목 | 값 |\n|---|---|\n| 최종 모델 | 로지스틱 회귀(가중치 켬, 판정 기준 0.5) |\n| 혼동행렬 | TP 40, FN 10, FP 242, TN 730 |\n| 정밀도 · 재현율 · F1 | 0.142 · 0.80 · 0.241 |\n| 베이스라인 | 정확도 0.951, 재현율 0 |\n| 판정 기준 0.75일 때 | F1 0.319, 재현율 0.60(환자 50명 중 30명) |\n| 고른 이유 | 세 모델의 차이가 환자 한두 명 수준이고, 계수로 결과를 설명할 수 있음 |"
+  }
+ ],
+ "summary": "다음 페이지(해석·한계)에서는 최종 모델이 무엇을 근거로 예측했는지 살펴보고, 이 결과를 믿기 어려운 이유를 수치로 정리합니다."
+}
