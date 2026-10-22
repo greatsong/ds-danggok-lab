@@ -139,6 +139,15 @@ def _run_code(code, ns, idx):
             st.error('코드 실행 중 오류: %s' % e)
 
 
+# 대화 속 마크다운 표: 한글이 글자 단위로 줄바꿈되지 않게 낱말 단위로 끊는다(좁은 첫 열의 "로지스틱 회귀"가 한 글자씩 내려가던 문제).
+# 그 대신 휴대폰처럼 좁은 화면에서는 표가 넓어지므로 표 안에서만 옆으로 밀어 보게 한다
+_TABLE_CSS = '''<style>
+[data-testid="stMarkdownContainer"] table td, [data-testid="stMarkdownContainer"] table th { word-break: keep-all; overflow-wrap: break-word; }
+[data-testid="stMarkdownContainer"] table td:first-child, [data-testid="stMarkdownContainer"] table th:first-child { min-width: 5.5em; }
+[data-testid="stMarkdownContainer"] table { display: block; max-width: 100%; overflow-x: auto; }
+</style>'''
+
+
 def run_chat(name):
     sc = load_scenario(name)
     steps = sc['steps']
@@ -146,6 +155,7 @@ def run_chat(name):
     if key not in st.session_state:
         st.session_state[key] = 1
 
+    st.markdown(_TABLE_CSS, unsafe_allow_html=True)
     st.title(sc['title'])
     if sc.get('intro'):
         md(sc['intro'])
