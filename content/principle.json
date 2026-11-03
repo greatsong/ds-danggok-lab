@@ -1,6 +1,6 @@
 {
  "title": "모델 원리",
- "intro": "이 페이지에서는 평가지표·결과 페이지에서 고른 최종 모델, 가중치를 켠 로지스틱 회귀가 어떤 원리로 확률을 계산하는지 시험용 데이터의 환자 한 명으로 직접 따라가며 AI에게 묻습니다. 후보였던 결정 트리와 랜덤 포레스트가 같은 환자를 어떻게 예측했는지 비교하고, 마지막에는 이해한 내용을 자기 말로 설명해 확인받습니다. 구술 인터뷰 ③과 포스터 문답에서 받는 모델 질문에 답할 내용이 이 대화에 모두 나옵니다.",
+ "intro": "이 페이지에서는 평가지표·결과 페이지에서 고른 최종 모델, 가중치를 켠 로지스틱 회귀가 어떤 원리로 확률을 계산하는지 시험용 데이터의 환자 한 명으로 직접 따라가며 AI에게 묻습니다. 후보였던 결정 트리와 랜덤 포레스트가 같은 환자를 어떻게 예측했는지 비교하고, 마지막에는 이해한 내용을 자기 말로 설명해 확인받습니다. 구술 ③④와 포스터 문답에서 받는 모델 질문에 답할 내용이 이 대화에 모두 나옵니다.",
  "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nweighted = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=\"balanced\")),\n    \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n}\nfor m in weighted.values():\n    m.fit(X_train, y_train)\nplain = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X_train, y_train)\nmodel = weighted[\"로지스틱 회귀\"]",
  "setup_note": "이 페이지는 평가지표·결과 페이지에서 고른 최종 모델(가중치를 켠 로지스틱 회귀)과 후보 모델 둘에서 이어집니다.",
  "steps": [
@@ -84,26 +84,26 @@
   {
    "who": "oral",
    "title": "구술 인터뷰 대비: 선정한 모델",
-   "text": "선정한 모델에 대한 질문은 구술 인터뷰 ③과 포스터 문답에서 팀원마다 묻습니다. 아래 예시 답은 이 대화에서 확인한 내용으로 만든 것이며, 자기 팀의 모델과 수치로 바꿔 답합니다.",
+   "text": "선정한 모델에 대한 질문은 구술 ③④와 포스터 문답에서 한 사람씩 묻습니다. 아래 예시 답은 이 대화에서 확인한 내용으로 만든 것이며, 자기 팀의 모델과 수치로 바꿔 답합니다.",
    "qa": [
     {
-     "cp": "c3",
-     "q": 0,
-     "label": "③ 질문",
-     "asked": "(팀원마다) 선정한 모델은 어떤 특징이 있고, 어떤 경우에 많이 사용됩니까?",
-     "a": "로지스틱 회귀는 확률을 내고, 계수로 각 열이 확률을 올리는 방향인지 내리는 방향인지 읽을 수 있습니다. 그래서 질병 위험이나 대출 연체처럼 \"있음/없음\"의 확률과 그 근거를 함께 설명해야 하는 분야에서 많이 사용됩니다."
+     "cp": "c34",
+     "q": 2,
+     "label": "③④ 질문",
+     "asked": "선정한 모델은 학습할 때 무엇을 정하고, 새 데이터가 들어오면 어떤 순서로 답을 냅니까?",
+     "a": "학습할 때는 학습용 4,087명으로 입력 열 16개의 계수와 절편 하나를 정합니다. 가중치를 켜서 환자를 틀리는 것을 더 크게 계산하도록 했습니다. 예측할 때는 열마다 값을 표준화하고, 계수를 곱해 모두 더한 뒤 절편을 더해 점수를 만듭니다. 이 점수를 S자 곡선으로 0과 1 사이 확률로 바꾸고, 0.5 이상이면 \"있음\"으로 답합니다."
     },
     {
-     "cp": "c3",
+     "cp": "c34",
+     "q": 3,
+     "label": "③④ 질문",
+     "asked": "우리 데이터의 한 사례로 답이 나오는 과정을 따라가 설명해 주세요.",
+     "a": "시험용 데이터의 첫 번째 환자로 따라갔습니다. 계수×값이 가장 큰 열은 나이로 2.682였습니다. 계수×값 16개의 합은 2.943이고 절편 −1.264를 더하면 점수 1.679가 됩니다. S자 곡선에 넣으면 확률 0.843으로 0.5보다 커서 \"있음\"으로 답했고, 실제로 환자였습니다."
+    },
+    {
+     "cp": "c34",
      "q": 1,
-     "label": "③ 질문",
-     "asked": "(팀원마다) 왜 이 문제를 푸는 데 이 모델이 적합합니까?",
-     "a": "예측할 값이 뇌졸중 있음과 없음 두 가지이고 환자를 놓치지 않는 것이 중요합니다. 로지스틱 회귀는 확률을 내므로 판정 기준을 조절해 재현율을 지킬 수 있고, 나이, 고혈압, 평균 혈당 같은 열이 위험을 높이는 방향인지 계수로 설명할 수 있습니다."
-    },
-    {
-     "cp": "c3",
-     "q": 4,
-     "label": "③ 질문",
+     "label": "③④ 질문",
      "asked": "점수가 가장 높은 모델이 아닌 다른 모델을 고른다면 그 이유는 무엇입니까?",
      "a": "F1은 결정 트리, 재현율은 랜덤 포레스트가 가장 높았습니다. 찾은 환자는 로지스틱 회귀 40명, 결정 트리 36명, 랜덤 포레스트 41명입니다. 랜덤 포레스트는 한 명을 더 찾는 대신 잘못 울린 경보가 74번 많았고, 결정 트리는 F1이 조금 높지만 환자를 4명 더 놓쳤습니다. 그래서 예측 이유를 계수로 설명할 수 있는 로지스틱 회귀를 골랐습니다."
     },

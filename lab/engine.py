@@ -13,7 +13,11 @@
     {"who": "check", "text": "학생이 직접 확인한 것(검증)"},
     {"who": "note", "title": "제목", "text": "정리 카드"},
     {"who": "oral", "title": "구술 인터뷰 대비: ...", "text": "안내", "checklist": "c3(선택, 그 회차의 준비 체크리스트)",
-     "qa": [{"cp": "c3", "q": "opener 또는 꼬리질문 번호(0부터)", "label": "③ 질문", "asked": "예시 답을 쓸 때의 질문", "a": "예시 답"}]}
+     "qa": [{"cp": "c3", "q": "opener 또는 꼬리질문 번호(0부터)", "label": "③ 질문", "asked": "예시 답을 쓸 때의 질문", "a": "예시 답"}]},
+    구술 연습(선생님과 학생 한 명의 문답)에 쓰는 세 가지:
+    {"who": "teacher", "cp": "c34", "q": "opener 또는 꼬리질문 번호", "asked": "대사를 쓸 때의 질문", "text": "질문 앞뒤에 붙일 말(선택)"},
+    {"who": "answer", "text": "학생의 답(선생님께 말하는 합쇼체)"},
+    {"who": "rubric", "cp": "c34", "item": "m-1", "checked": [0, 1], "text": "빠진 것·다음 질문으로 이어지는 까닭(선택)"}
   ],
   "summary": "마무리 글(마크다운)",
   "setup": "페이지를 열 때 조용히 실행할 코드(선택, 앞 페이지에서 이어지는 df 등)", "setup_note": "그 안내 한 줄(선택)"
@@ -98,13 +102,37 @@ def _oral_card(s):
         for qa in s.get('qa', []):
             c = cps.get(qa['cp'], {})
             fu = c.get('followups', [])
-            q = c.get('opener') if qa['q'] == 'opener' else (fu[qa['q']] if isinstance(qa['q'], int) and qa['q'] < len(fu) else None)
+            q = c.get('opener') if qa['q'] == 'opener' else (fu[qa['q']] if type(qa['q']) is int and 0 <= qa['q'] < len(fu) else None)
             md('**%s** %s' % (qa.get('label', ''), q or qa.get('asked', '')))
             md('> 예시 답: ' + qa['a'])
         if s.get('checklist') in cps:
             c = cps[s['checklist']]
             with st.expander('%s %s 준비 체크리스트(구술 평가 안내와 같은 목록)' % (c['no'], c['title'])):
                 md('\n'.join('- ' + x for x in c['checklist']))
+
+
+def _ask(s):
+    """선생님 질문: 루브릭(oral.json)의 지금 문구를 쓰고, 없으면 시나리오에 적어 둔 질문을 쓴다"""
+    c = _oral_checkpoints().get(s.get('cp'), {})
+    fu = c.get('followups', [])
+    q = c.get('opener') if s.get('q') == 'opener' else (fu[s['q']] if type(s.get('q')) is int and 0 <= s['q'] < len(fu) else None)
+    return q or s.get('asked', '')
+
+
+def _rubric_card(s):
+    """담은 내용 확인: 선생님 앱처럼 그 항목의 평가 요소를 체크로 보여 준다(상·중·하는 선생님이 정하므로 보여 주지 않는다)"""
+    c = _oral_checkpoints().get(s.get('cp'), {})
+    it = next((x for x in c.get('items', []) if x['id'] == s.get('item')), None)
+    with st.container(border=True):
+        if not it:
+            md(s.get('text', ''))
+            return
+        done = set(s.get('checked', []))
+        md('#### 담은 내용 확인 · %s' % it['title'])
+        md('\n'.join(('- ✅ ' if i in done else '- ⬜ ') + e for i, e in enumerate(it['elements'])))
+        st.caption('담은 내용 %d / %d' % (len(done), len(it['elements'])))
+        if s.get('text'):
+            md(s['text'])
 
 
 def load_scenario(name):
@@ -186,6 +214,21 @@ def run_chat(name):
                     md('#### ' + s['title'])
                 md(s['text'])
             continue
+        if who == 'teacher':
+            with st.chat_message('assistant', avatar='👩‍🏫'):
+                st.markdown('**선생님**')
+                if s.get('text'):
+                    md(s['text'])
+                md('**' + _ask(s) + '**')
+            continue
+        if who == 'answer':
+            with st.chat_message('user', avatar='🧑‍🎓'):
+                st.markdown('**학생 · 답**')
+                md(s['text'])
+            continue
+        if who == 'rubric':
+            _rubric_card(s)
+            continue
         if who == 'check':
             with st.chat_message('user', avatar='🔎'):
                 st.markdown('**학생 · 직접 확인하기**')
@@ -204,7 +247,8 @@ def run_chat(name):
     if not show_all and st.session_state[key] < len(steps):
         nxt = steps[st.session_state[key]]
         label = {'student': '다음: 학생이 묻기', 'ai': '다음: AI가 답하기', 'check': '다음: 직접 확인하기',
-                 'note': '다음: 정리하기', 'oral': '다음: 구술 인터뷰 대비'}.get(nxt['who'], '다음')
+                 'note': '다음: 정리하기', 'oral': '다음: 구술 인터뷰 대비', 'teacher': '다음: 선생님 질문',
+                 'answer': '다음: 학생이 답하기', 'rubric': '다음: 담은 내용 확인'}.get(nxt['who'], '다음')
         if st.button(label + ' ▶', type='primary', key='next_' + name, width='stretch'):
             st.session_state[key] += 1
             st.rerun()
