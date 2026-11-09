@@ -1,133 +1,100 @@
 {
- "title": "모델 후보·베이스라인",
- "intro": "이 페이지에서는 전처리한 데이터로 뇌졸중 여부(stroke, 0 또는 1)를 예측합니다. 예측할 값이 두 가지로 나뉘므로 분류 문제입니다. AI에게 이 문제에 어울리는 모델 2~3개를 추천받고, 모델마다 궁금한 점을 묻고, 같은 조건에서 시험해 베이스라인과 비교합니다. 회귀나 군집 문제를 푸는 팀도 문제의 종류를 밝히고 같은 방식으로 추천받아 비교합니다. 구술 ③④에서 받는 질문(무엇으로 풀었는지, 베이스라인이 무엇이고 왜 정하는지, 어떤 후보를 같은 조건에서 비교했는지)에 답할 내용이 이 대화에 모두 나옵니다.",
- "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])",
- "setup_note": "이 페이지는 전처리 페이지에서 만든 데이터(`df_prep`, 5,109행 12열)에서 이어집니다.",
- "steps": [
-  {
-   "who": "student",
-   "text": "stroke(있음/없음)를 예측하고 싶어. 회귀, 분류, 군집 가운데 무엇으로 풀어야 하는지 이유와 함께 알려 줘. 어울리는 모델 2~3개를 추천하고 모델마다 예측 원리, 장점과 단점, 많이 사용되는 경우를 표로 정리해 줘."
-  },
-  {
-   "who": "ai",
-   "text": "예측할 값이 있음과 없음 두 범주이고 데이터에 정답 열(stroke)이 있으므로 분류입니다. 숫자를 예측하면 회귀이고 정답 없이 비슷한 것끼리 묶으면 군집입니다. 분류 문제에 많이 사용하는 모델 세 가지(로지스틱 회귀, 결정 트리, 랜덤 포레스트)를 추천합니다.\n\n| 모델 | 예측하는 원리 | 장점 | 단점 | 많이 사용되는 경우 |\n|---|---|---|---|---|\n| 로지스틱 회귀 | 열마다 계수를 곱해 더한 점수를 0과 1 사이 확률로 바꾸고, 확률이 판정 기준 이상이면 \"있음\"으로 예측 | 계수로 각 열이 확률을 올리는지 내리는지 읽을 수 있음, 확률을 내므로 판정 기준을 조절하기 쉬움 | 열의 값이 커질 때 확률이 한 방향으로만 오르거나 내린다고 보고 계산함 | 질병 위험, 대출 연체처럼 \"있음/없음\"의 확률과 근거를 함께 설명해야 할 때 |\n| 결정 트리 | \"나이가 몇 세 이하인가?\" 같은 예/아니요 질문을 이어 데이터를 나누고, 마지막에 도착한 칸에서 많은 쪽으로 예측 | 질문 순서를 그대로 읽을 수 있어 설명하기 쉬움, 열의 단위를 맞추지 않아도 됨 | 질문을 깊게 이어 가면 학습용 데이터를 외워 새 데이터에서 틀리기 쉬움 | 판단 규칙을 사람이 읽고 확인해야 할 때 |\n| 랜덤 포레스트 | 데이터와 열을 무작위로 바꿔 가며 만든 결정 트리 여러 그루(기본 100그루)의 확률을 평균해 예측 | 나무 한 그루보다 예측이 안정적이고, 열 사이의 복잡한 관계도 담음 | 나무가 많아 예측 이유를 한눈에 설명하기 어렵고, 학습 시간이 더 걸림 | 설명보다 예측 성능이 중요하고 열이 많을 때 |",
-   "after": "어떤 모델이 이 데이터에 가장 잘 맞는지는 표만으로 알 수 없고, 같은 조건에서 시험해 봐야 압니다."
-  },
-  {
-   "who": "student",
-   "text": "로지스틱 회귀는 이름에 \"회귀\"가 들어가는데, 숫자를 예측하는 회귀가 아니라 분류에 써도 돼?"
-  },
-  {
-   "who": "ai",
-   "text": "분류에 써도 됩니다. 로지스틱 회귀는 \"있음\"일 확률(0과 1 사이 숫자)을 계산하고, 그 확률을 판정 기준(보통 0.5)과 비교해 \"있음\"과 \"없음\"으로 나눕니다. 확률을 계산하는 과정이 회귀와 비슷해 이름에 회귀가 들어갔지만 분류에 쓰는 모델입니다. 확률을 내므로 판정 기준을 바꿔 환자를 더 많이 찾도록 조절할 수 있습니다."
-  },
-  {
-   "who": "student",
-   "text": "결정 트리는 어떤 식으로 질문을 만들어 데이터를 나눠? 표에 있는 \"질문을 깊게 이어 가면 학습용 데이터를 외운다\"는 말은 무슨 뜻이야?"
-  },
-  {
-   "who": "ai",
-   "text": "결정 트리는 학습용 데이터에서 환자와 환자가 아닌 사람이 가장 잘 갈라지는 질문(예: 나이가 몇 세 이하인가)을 찾고, 나뉜 무리마다 다시 질문을 찾는 일을 되풀이합니다. 질문을 깊게 이어 가면 학습용 데이터의 한 사람 한 사람까지 따로 떼어 내는 규칙이 생깁니다. 이 규칙은 학습용 데이터에만 맞고 새 데이터에서는 잘 맞지 않는데, 이것을 학습용 데이터를 외운다(과대적합)고 합니다. 그래서 질문을 이어 가는 깊이(나무의 깊이)를 제한합니다."
-  },
-  {
-   "who": "student",
-   "text": "랜덤 포레스트는 결정 트리와 무엇이 달라? 나무가 많으면 항상 더 좋은 거야?"
-  },
-  {
-   "who": "ai",
-   "text": "랜덤 포레스트는 학습용 데이터에서 사람을 무작위로 다시 뽑고(같은 사람이 여러 번 뽑힐 수 있음), 질문을 고를 때도 열을 일부만 무작위로 살펴보며 결정 트리를 여러 그루(기본 100그루) 만듭니다. 예측할 때는 나무들이 낸 확률을 평균합니다. 나무 한 그루의 실수가 평균에서 줄어들어 보통 한 그루보다 안정적이지만, 항상 더 좋은 것은 아니므로 우리 데이터의 시험용 결과로 확인해야 합니다. 대신 나무가 많아 예측 이유를 한눈에 설명하기 어렵습니다."
-  },
-  {
-   "who": "student",
-   "text": "세 모델을 공정하게 비교하려면 무엇을 같게 맞춰야 해?"
-  },
-  {
-   "who": "ai",
-   "text": "세 모델을 공정하게 비교하려면 다음 조건을 같게 맞춰야 합니다.\n- 같은 학습용 데이터와 시험용 데이터(같은 행으로 나눈 것)\n- 같은 입력 열\n- 무작위가 들어가는 과정의 난수 고정(random_state)\n- 같은 시험용 데이터에서 같은 지표로 평가\n\n조건이 다르면 점수 차이가 모델 때문인지 조건 때문인지 알 수 없습니다."
-  },
-  {
-   "who": "student",
-   "text": "앞에서 말한 조건대로 세 모델을 비교할 수 있게 데이터를 나눠 줘: 시험용은 20%, 뇌졸중 비율이 두 데이터에서 같게, 난수는 42로 고정. 글자 열은 모델이 읽을 수 있는 숫자 열로 바꿔 줘."
-  },
-  {
-   "who": "ai",
-   "text": "글자 열을 0과 1로 된 열로 바꾸고(원-핫 인코딩), 뇌졸중 비율을 맞춰 학습용과 시험용으로 나누는 코드입니다.",
-   "code": "from sklearn.model_selection import train_test_split\n\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, stratify=y, random_state=42)\n\nst.write(\"입력 열 개수:\", X.shape[1])\nst.write(list(X.columns))\nst.write(\"학습용:\", len(X_train), \"행 / 시험용:\", len(X_test), \"행\")\nst.write(\"뇌졸중 비율 학습용:\", round(y_train.mean() * 100, 2), \"% / 시험용:\", round(y_test.mean() * 100, 2), \"%\")\nst.write(\"시험용 뇌졸중 환자:\", y_test.sum(), \"명\")",
-   "after": "글자 열을 바꿔 입력 열이 16개가 되었습니다. 학습용 4,087행, 시험용 1,022행이고 뇌졸중 비율은 4.87%와 4.89%로 거의 같습니다. 시험용의 뇌졸중 환자는 50명이라, 모델을 평가할 때 이 50명을 몇 명 찾는지가 중요합니다."
-  },
-  {
-   "who": "student",
-   "text": "모델과 비교할 베이스라인을 만들어 줘. 베이스라인이 왜 필요한지도 알려 줘. 정확도와 재현율을 보여 줘."
-  },
-  {
-   "who": "ai",
-   "text": "베이스라인은 데이터에서 아무것도 배우지 않고 모든 사람을 가장 많은 쪽(뇌졸중 없음)으로 예측하는 기준입니다. 모델이 이 기준보다 나아야 데이터에서 무언가를 배웠다고 말할 수 있으므로 베이스라인이 필요합니다. 그렇게 만든 코드입니다.",
-   "code": "from sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import accuracy_score, recall_score\n\nbaseline = DummyClassifier(strategy=\"most_frequent\")\nbaseline.fit(X_train, y_train)\npred = baseline.predict(X_test)\nst.write(\"베이스라인 정확도:\", round(accuracy_score(y_test, pred), 3))\nst.write(\"베이스라인 재현율:\", round(recall_score(y_test, pred), 3))",
-   "after": "베이스라인은 정확도 0.951이지만 재현율은 0입니다. 아무도 뇌졸중으로 예측하지 않으니 환자를 한 명도 찾지 못합니다. 앞으로 만들 모델은 정확도가 아니라 재현율과 F1에서 이 베이스라인을 넘어야 합니다."
-  },
-  {
-   "who": "student",
-   "text": "모델 후보 세 개(로지스틱 회귀, 결정 트리, 랜덤 포레스트)를 만들어 정확도를 비교해 줘."
-  },
-  {
-   "who": "ai",
-   "text": "세 모델을 학습시키고 정확도를 보여 주는 코드입니다. 로지스틱 회귀는 크기가 다른 열을 맞추는 표준화를 함께 씁니다.",
-   "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\n\nmodels = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)),\n    \"결정 트리\": DecisionTreeClassifier(random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(random_state=42),\n}\nfor name, model in models.items():\n    model.fit(X_train, y_train)\n    st.write(name, \"정확도:\", round(model.score(X_train, y_train), 3))",
-   "after": "결정 트리와 랜덤 포레스트의 정확도가 1.0으로 가장 높습니다. 랜덤 포레스트를 최종 모델로 고르면 됩니다.",
-   "flag": "wrong"
-  },
-  {
-   "who": "check",
-   "text": "정확도가 1.0이라는 게 이상해. 앞에서 결정 트리는 질문을 깊게 이어 가면 학습용 데이터를 외운다고 했고, 랜덤 포레스트도 항상 더 좋은 건 아니라고 했잖아. 이 정확도는 어떤 데이터로 계산한 거야? 시험용 데이터로 정확도, 재현율, F1을 다시 계산해 줘."
-  },
-  {
-   "who": "ai",
-   "text": "시험용 데이터로 다시 계산하는 코드입니다.",
-   "code": "from sklearn.metrics import f1_score\n\nrows = []\nfor name, model in models.items():\n    pred = model.predict(X_test)\n    rows.append([name, accuracy_score(y_test, pred), recall_score(y_test, pred), f1_score(y_test, pred)])\nresult = pd.DataFrame(rows, columns=[\"모델\", \"정확도\", \"재현율\", \"F1\"]).round(3)\nst.dataframe(result, hide_index=True)",
-   "after": "앞의 정확도는 학습에 쓴 데이터로 계산한 것이라 잘못된 비교였습니다. 결정 트리와 랜덤 포레스트는 학습용 데이터를 외워서 1.0이 나온 것입니다(과대적합). 시험용으로 보면 랜덤 포레스트의 재현율은 0, 로지스틱 회귀는 0.02, 결정 트리는 0.16으로 환자를 거의 찾지 못해 베이스라인과 큰 차이가 없습니다. 모델은 반드시 학습에 쓰지 않은 시험용 데이터로 평가해야 합니다."
-  },
-  {
-   "who": "note",
-   "title": "검증 기록 남기기",
-   "text": "학습용 정확도로 비교하자는 제안을 시험용 데이터로 확인해 바꾼 과정을 log에 남깁니다.\n\n```text\n## 20211 박서연\n- 오늘 결정한 것: 모델은 시험용 데이터의 재현율과 F1로 비교하기로 함.\n- AI에게 보낸 프롬프트(원문): 정확도가 1.0이라는 게 이상해. 앞에서 결정 트리는 질문을 깊게 이어 가면 학습용 데이터를 외운다고 했고, 랜덤 포레스트도 항상 더 좋은 건 아니라고 했잖아. 이 정확도는 어떤 데이터로 계산한 거야? 시험용 데이터로 정확도, 재현율, F1을 다시 계산해 줘.\n- AI가 준 것 중 고치거나 버린 것과 그 이유: AI는 결정 트리와 랜덤 포레스트의 정확도가 1.0이라고 했지만 학습용으로 계산한 값이었고, 시험용으로 다시 계산하니 재현율이 0~0.16이라 그 결론을 버림.\n- 느낀 점: 정확도 1.0이라는 숫자가 오히려 의심할 신호였다는 걸 알게 됨.\n```"
-  },
-  {
-   "who": "student",
-   "text": "뇌졸중 환자를 더 잘 찾도록 수업에서 배운 가중치를 켜서 세 모델을 다시 만들어 줘. 결정 트리와 랜덤 포레스트가 학습용을 외우지 않게 해 줘. 베이스라인과 함께 정확도, 정밀도, 재현율, F1을 표로 비교해 줘."
-  },
-  {
-   "who": "ai",
-   "text": "가중치를 켜면 수가 적은 뇌졸중 환자를 틀렸을 때 더 크게 고칩니다. 결정 트리와 랜덤 포레스트는 나무의 깊이를 5까지로 제한해 학습용 데이터를 외우지 않게 합니다. 그렇게 만든 코드입니다.",
-   "code": "from sklearn.metrics import precision_score\n\nweighted = {\n    \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=\"balanced\")),\n    \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n    \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=\"balanced\", random_state=42),\n}\nrows = [[\"베이스라인\", accuracy_score(y_test, baseline.predict(X_test)), 0.0, 0.0, 0.0]]\nfor name, model in weighted.items():\n    model.fit(X_train, y_train)\n    pred = model.predict(X_test)\n    rows.append([name, accuracy_score(y_test, pred), precision_score(y_test, pred),\n                 recall_score(y_test, pred), f1_score(y_test, pred)])\ntable = pd.DataFrame(rows, columns=[\"모델\", \"정확도\", \"정밀도\", \"재현율\", \"F1\"]).round(3)\nst.dataframe(table, hide_index=True)",
-   "after": "가중치를 켜자 재현율이 크게 올랐습니다. 로지스틱 회귀 0.80, 결정 트리 0.72, 랜덤 포레스트 0.82입니다. 대신 정확도는 0.68~0.80으로 내려가고 정밀도는 0.12~0.16입니다. 세 모델 모두 재현율과 F1에서 베이스라인(0과 0)을 넘었습니다. 어느 모델을 고를지는 다음 페이지(평가지표·결과)에서 정합니다."
-  },
-  {
-   "who": "note",
-   "title": "README에 옮길 후보 비교표",
-   "text": "| 모델 | 정확도 | 정밀도 | 재현율 | F1 |\n|---|---|---|---|---|\n| 베이스라인(모두 \"없음\") | 0.951 | 0 | 0 | 0 |\n| 로지스틱 회귀(가중치) | 0.753 | 0.142 | 0.80 | 0.241 |\n| 결정 트리(가중치, 깊이 5) | 0.795 | 0.155 | 0.72 | 0.255 |\n| 랜덤 포레스트(가중치, 깊이 5) | 0.682 | 0.115 | 0.82 | 0.201 |"
-  },
-  {
-   "who": "oral",
-   "title": "구술 인터뷰 대비: 모델 후보·베이스라인",
-   "text": "구술 ③④에서 선생님은 한 사람씩 아래처럼 묻습니다. 아래 예시 답은 이 대화에서 확인한 내용으로 만든 것이며, 자기 팀의 모델과 수치로 바꿔 답합니다. 다섯 항목 전체를 묻고 답하는 장면은 구술 연습 페이지에 있습니다.",
-   "qa": [
+  "title": "모델 후보·베이스라인",
+  "intro": "이 페이지에서는 팀의 탐구 질문과 문제 종류를 먼저 밝히고 AI에게 베이스라인과 모델 세 개를 추천받습니다. 베이스라인의 뜻을 묻고, 세 모델을 같은 조건에서 비교하는 앱을 받아 직접 만져 봅니다. 궁금한 점을 계속 물으며 이해한 것을 자기 말로 설명해 봅니다. 화면의 앱은 실제로 작동하며, 코드는 '코드 보기'를 눌러 확인할 수 있습니다.",
+  "setup": "import pandas as pd\ndf = pd.read_csv(\"https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv\", encoding=\"utf-8\")\ndf_prep = df.copy()\ndf_prep[\"bmi_missing\"] = df_prep[\"bmi\"].isna().astype(int)\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].fillna(df_prep[\"bmi\"].median())\ndf_prep[\"bmi\"] = df_prep[\"bmi\"].clip(upper=60)\ndf_prep = df_prep[df_prep[\"gender\"] != \"Other\"].drop(columns=[\"id\"])",
+  "setup_note": "이 페이지는 전처리 페이지에서 만든 데이터(`df_prep`, 5,109행 12열)에서 이어집니다.",
+  "code_fold": true,
+  "steps": [
     {
-     "cp": "c34",
-     "q": "opener",
-     "label": "③④ 시작 질문",
-     "asked": "우리 팀이 회귀·분류·군집 가운데 무엇으로 풀었는지 말하고, 베이스라인 모델이 무엇인지, 왜 그것을 정하는지 설명해 주세요.",
-     "a": "뇌졸중이 있다·없다 두 범주를 맞히고 정답(stroke 열)이 데이터에 있어서 분류를 골랐습니다. 베이스라인 모델은 모든 사람을 가장 많은 쪽인 \"없음\"으로 예측합니다. 시험용 1,022명에서 정확도는 0.951이지만 재현율은 0으로 환자 50명을 한 명도 찾지 못합니다. 우리 모델은 재현율 0.80, F1 0.241입니다. 우리 모델이 아무 정보 없이 찍을 때보다 정말 나은지 판단할 기준이 필요해서입니다. 이 데이터는 환자가 4.87%뿐이라 모두 \"없음\"으로 찍어도 정확도가 0.951입니다. 베이스라인이 없으면 우리 모델의 정확도 0.753이 낮아 보이기만 하는데, 베이스라인과 비교하면 재현율이 0에서 0.80으로 올라 환자 40명을 더 찾았다는 것을 알 수 있습니다."
+      "who": "student",
+      "text": "우리 팀은 나이, 평균 혈당, 고혈압 같은 건강 정보로 뇌졸중 위험이 높은 사람을 미리 찾을 수 있는지 알아보고 있어. 그래서 전처리한 뇌졸중 데이터로 분류 문제를 풀려고 해. 베이스라인 모델을 정해 주고, 이 문제에 적합한 모델 세 개를 추천해 줘."
     },
     {
-     "cp": "c34",
-     "q": 0,
-     "label": "③④ 질문",
-     "asked": "비교한 후보 모델은 무엇이고, 같은 조건에서 비교했다는 근거는 무엇입니까?",
-     "a": "로지스틱 회귀, 결정 트리, 랜덤 포레스트 세 가지를 비교했습니다. 세 모델 모두 같은 학습용 4,087행과 시험용 1,022행, 같은 입력 열 16개를 사용했고, 데이터를 나눌 때 난수를 42로 고정했습니다. 같은 시험용 데이터에서 가중치를 켠 뒤 재현율은 0.80, 0.72, 0.82이고 F1은 0.241, 0.255, 0.201이었습니다."
+      "who": "ai",
+      "text": "예측할 값인 stroke가 있음과 없음 두 가지이고 데이터에 정답 열이 있으므로 분류가 맞습니다. 베이스라인은 데이터에서 아무것도 배우지 않고 모든 사람을 가장 많은 쪽인 '없음'으로 예측하는 모델입니다. 추천 모델은 로지스틱 회귀, 결정 트리, 랜덤 포레스트이며 아래 표에 정리했습니다.\n\n| 모델 | 핵심 아이디어 | 장점 | 주의할 점 |\n|---|---|---|---|\n| 로지스틱 회귀 | 열마다 값에 계수를 곱해 더한 점수를 0과 1 사이 확률로 바꾼다 | 예측 이유를 계수로 설명하기 쉽다 | 열의 영향을 더하기로만 계산해 복잡한 관계는 놓칠 수 있다 |\n| 결정 트리 | \"나이가 67.5세 이하인가?\" 같은 예·아니요 질문을 이어 가며 나눈다 | 질문 순서를 그대로 보여 줄 수 있다 | 질문을 너무 깊게 이어 가면 학습용 데이터를 외운다 |\n| 랜덤 포레스트 | 조금씩 다르게 만든 결정 트리 여러 그루의 확률을 평균한다 | 나무 한 그루보다 결과가 안정적이다 | 나무가 많아 예측 이유를 설명하기 어렵다 |",
+      "after": "표만으로는 어느 모델이 이 데이터에 가장 잘 맞는지 알 수 없으며, 같은 조건에서 직접 시험해 봐야 알 수 있습니다."
+    },
+    {
+      "who": "student",
+      "text": "베이스라인 모델이 무슨 뜻인지 궁금해. 아무것도 배우지 않는 모델을 왜 굳이 만드는 거야?"
+    },
+    {
+      "who": "ai",
+      "text": "베이스라인은 아무 정보 없이 찍었을 때의 결과이며, 모델이 이것보다 나아야 데이터에서 무언가를 배웠다고 말할 수 있습니다. 앱은 데이터를 학습용과 시험용으로 나눈 뒤, 세 가지 찍는 방법의 결과를 시험용 데이터로 보여 줍니다. 시험용은 전체의 20%이고, 뇌졸중 비율이 두 데이터에서 같게 나누어져 있습니다.",
+      "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import confusion_matrix\n\n# 글자 열을 0과 1로 된 열로 바꾸고, 시험용 20%를 뇌졸중 비율이 같게 나눈다(난수 42로 고정)\nX = pd.get_dummies(df_prep.drop(columns=[\"stroke\"]), drop_first=True, dtype=int)\ny = df_prep[\"stroke\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\n# 아무것도 배우지 않고 찍는 방법을 골라 본다\nways = {\"모두 '없음'으로 찍기\": \"most_frequent\", \"모두 '있음'으로 찍기\": \"constant\", \"무작위로 찍기\": \"uniform\"}\nway = st.radio(\"찍는 방법\", list(ways), horizontal=True, key=\"m_way\")\ndummy = DummyClassifier(strategy=ways[way], constant=1, random_state=42).fit(X_train, y_train)\ntn, fp, fn, tp = confusion_matrix(y_test, dummy.predict(X_test)).ravel()\n\nc = st.columns(3)\nc[0].metric(\"정확도\", f\"{(tp + tn) / len(y_test):.3f}\")\nc[1].metric(\"찾은 환자\", f\"{tp} / {tp + fn}명\")\nc[2].metric(\"잘못 울린 경보\", f\"{fp}번\")\n\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)   # 베이스라인: 모두 '없음'\n",
+      "after": "모두 '없음'으로 찍으면 정확도가 0.951이지만 환자 50명 가운데 한 명도 찾지 못합니다. 이유는 시험용 1,022명 가운데 환자가 50명뿐이라 '없음'만 말해도 대부분 맞기 때문입니다. 모두 '있음'으로 찍으면 환자 50명을 모두 찾지만 경보를 972번 잘못 울립니다. 그래서 정확도가 아니라 실제 환자 가운데 찾아낸 비율, 곧 재현율로 베이스라인을 넘어야 하며, 베이스라인의 재현율은 0입니다."
+    },
+    {
+      "who": "student",
+      "text": "표를 다시 보다가 랜덤 포레스트가 궁금해졌어. 같은 데이터로 결정 트리를 여러 그루 만들면 모두 똑같은 나무가 나오지 않는지, 그런데 왜 여러 그루를 만드는 거야?"
+    },
+    {
+      "who": "ai",
+      "text": "나무마다 학습용 데이터에서 사람을 무작위로 다시 뽑으며, 같은 사람이 여러 번 뽑힐 수 있습니다. 질문을 고를 때도 열을 일부만 무작위로 살펴봅니다. 그래서 나무마다 조금씩 다른 질문을 하게 되고, 기본으로 100그루를 만들어 확률을 평균합니다. 한 그루가 틀려도 다른 나무들과 평균하면 그 실수가 줄어듭니다."
+    },
+    {
+      "who": "student",
+      "text": "추천한 세 모델을 학습시켜 베이스라인과 비교하는 앱을 만들어 줘. 모델마다 정확도와 시험용 환자 50명 가운데 찾은 환자 수를 보여 줘."
+    },
+    {
+      "who": "ai",
+      "text": "공정하게 비교하려고 조건을 같게 맞추었습니다. 같은 학습용·시험용 데이터, 같은 입력 열, 난수 42를 고정했습니다. 결정 트리와 랜덤 포레스트는 나무의 깊이를 5까지로 제한했으며, 깊이는 모델 원리 페이지에서 바꿔 볼 수 있습니다.",
+      "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\n\ndef make_models(weight=None):\n    \"\"\"같은 조건의 세 후보(나무의 깊이는 5로 제한)\"\"\"\n    return {\n        \"로지스틱 회귀\": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight=weight)),\n        \"결정 트리\": DecisionTreeClassifier(max_depth=5, class_weight=weight, random_state=42),\n        \"랜덤 포레스트\": RandomForestClassifier(max_depth=5, class_weight=weight, random_state=42),\n    }\n\ndef compare(models):\n    \"\"\"같은 학습용 데이터로 학습하고 같은 시험용 데이터로 비교한다\"\"\"\n    rows = []\n    for name, m in [(\"베이스라인\", baseline)] + list(models.items()):\n        m.fit(X_train, y_train)\n        tn, fp, fn, tp = confusion_matrix(y_test, m.predict(X_test)).ravel()\n        rows.append({\"모델\": name, \"정확도\": round((tp + tn) / len(y_test), 3),\n                     \"찾은 환자(50명 중)\": tp, \"잘못 울린 경보\": fp})\n    return pd.DataFrame(rows)\n\nresult = compare(make_models())\nst.dataframe(result, hide_index=True)\nst.plotly_chart(px.bar(result, x=\"모델\", y=\"찾은 환자(50명 중)\", text_auto=True, range_y=[0, 50]))\n",
+      "after": "세 모델의 정확도는 모두 0.95 안팎으로 베이스라인과 비슷합니다. 찾은 환자는 로지스틱 회귀 1명, 결정 트리 1명, 랜덤 포레스트 0명입니다."
+    },
+    {
+      "who": "student",
+      "text": "결과가 이상하다고 느껴. 학습을 했는데 베이스라인과 거의 같아. 왜 환자를 거의 못 찾는 거야, 고칠 방법이 있어?"
+    },
+    {
+      "who": "ai",
+      "text": "원인은 학습용 데이터에서 환자가 4.87%뿐이라 모델이 '없음' 쪽으로 기울어지기 때문입니다. 환자 몇 명을 틀려도 전체에서 틀린 수가 적어 보이기 때문입니다. 해결 방법은 가중치, 곧 수가 적은 환자를 틀리면 더 크게 고치도록 하는 설정입니다. 이 설정은 `class_weight`로 켭니다.",
+      "code": "on = st.toggle(\"가중치 켜기: 환자를 틀리면 더 크게 고친다\", value=True, key=\"m_weight\")\nresult = compare(make_models(\"balanced\" if on else None))\nst.dataframe(result, hide_index=True)\nfig = px.bar(result, x=\"모델\", y=[\"찾은 환자(50명 중)\", \"잘못 울린 경보\"], barmode=\"group\", text_auto=True)\nst.plotly_chart(fig)\n",
+      "after": "가중치를 켜면 찾은 환자가 로지스틱 회귀 40명, 결정 트리 36명, 랜덤 포레스트 41명입니다. 대신 잘못 울린 경보가 242번, 196번, 316번으로 늘어납니다. 세 모델 모두 찾은 환자 수에서 베이스라인을 넘습니다."
+    },
+    {
+      "who": "student",
+      "text": "가중치를 켜면 모델 안에서 실제로 무엇이 바뀌는지 궁금해. 같은 데이터인데 어떻게 결과가 이렇게 달라지는 거야?"
+    },
+    {
+      "who": "ai",
+      "text": "모델은 학습할 때 얼마나 틀렸는지를 점수로 계산하고, 그 점수가 줄어드는 쪽으로 계수나 질문을 고칩니다. 학습용 데이터에는 환자가 199명, 환자가 아닌 사람이 3,888명입니다. 가중치를 켜면 환자 한 명을 틀린 것을 환자가 아닌 사람 한 명을 틀린 것보다 약 19.5배 크게 셉니다. 그래서 모델이 환자를 놓치지 않는 쪽으로 기준을 옮기며, 그 대가로 정확도는 로지스틱 회귀의 경우 0.951에서 0.753으로 내려갑니다."
+    },
+    {
+      "who": "student",
+      "text": "구술 인터뷰에서 설명할 수 있게 자기 말로 정리해 보려고 해. 빠진 것이 있으면 알려 줘. 뇌졸중 있음과 없음 두 가지를 맞히고 정답 열이 있어서 분류로 풀었어. 베이스라인은 모두 '없음'으로 찍는 모델이고, 우리 모델은 정확도가 아니라 찾은 환자 수로 이것을 넘어야 해. 환자가 적어서 가중치를 켰더니 환자를 훨씬 많이 찾았어."
+    },
+    {
+      "who": "ai",
+      "text": "무엇을 했는지와 왜 그런지의 순서가 맞습니다. 근거 수치를 함께 말하면 설득력이 커집니다. 예를 들어 베이스라인은 정확도 0.951이지만 0명을 찾았고, 가중치를 켜자 로지스틱 회귀가 1명에서 40명을 찾았습니다. 얻은 것과 함께 대가도 말하면 좋습니다. 정확도가 0.753으로 내려가고 경보를 242번 잘못 울렸습니다."
+    },
+    {
+      "who": "note",
+      "title": "정리: 베이스라인과 세 후보",
+      "text": "베이스라인과 가중치를 켠 세 후보의 비교를 아래 표로 정리하고 README에 옮깁니다.\n\n| 모델 | 정확도 | 찾은 환자(50명 중) | 잘못 울린 경보 |\n|---|---|---|---|\n| 베이스라인(모두 '없음') | 0.951 | 0 | 0 |\n| 로지스틱 회귀(가중치 켬) | 0.753 | 40 | 242 |\n| 결정 트리(가중치 켬, 깊이 5) | 0.795 | 36 | 196 |\n| 랜덤 포레스트(가중치 켬, 깊이 5) | 0.682 | 41 | 316 |"
+    },
+    {
+      "who": "oral",
+      "title": "구술 인터뷰 대비: 모델 후보·베이스라인",
+      "text": "구술 ③④에서 선생님은 한 사람씩 아래처럼 묻습니다. 아래 예시 답은 이 대화에서 확인한 내용으로 만든 것이며, 자기 팀의 모델과 수치로 바꿔 답합니다. 다섯 항목 전체를 묻고 답하는 장면은 구술 연습 페이지에 있습니다.",
+      "qa": [
+        {
+          "cp": "c34",
+          "q": "opener",
+          "label": "③④ 시작 질문",
+          "asked": "우리 팀이 회귀·분류·군집 가운데 무엇으로 풀었는지 말하고, 베이스라인 모델이 무엇인지, 왜 그것을 정하는지 설명해 주세요.",
+          "a": "뇌졸중이 있다·없다 두 범주를 맞히고 정답(stroke 열)이 데이터에 있어서 분류를 골랐습니다. 베이스라인 모델은 모든 사람을 가장 많은 쪽인 '없음'으로 예측합니다. 시험용 1,022명에서 정확도는 0.951이지만 재현율은 0으로 환자 50명을 한 명도 찾지 못합니다. 베이스라인을 정하는 까닭은 우리 모델이 아무 정보 없이 찍을 때보다 정말 나은지 판단할 기준이 필요하기 때문입니다. 환자가 4.87%뿐이라 모두 '없음'으로 찍어도 정확도가 0.951입니다. 우리 모델인 랜덤 포레스트는 정확도 0.682로 낮아 보이지만, 재현율이 0에서 0.82로 올라 환자 41명을 찾습니다. F1은 0.201입니다."
+        },
+        {
+          "cp": "c34",
+          "q": 0,
+          "label": "③④ 질문",
+          "asked": "비교한 후보 모델은 무엇이고, 같은 조건에서 비교했다는 근거는 무엇입니까?",
+          "a": "로지스틱 회귀, 결정 트리, 랜덤 포레스트 세 가지를 비교했습니다. 세 모델 모두 같은 학습용 4,087행과 시험용 1,022행, 같은 입력 열 16개를 사용했고, 데이터를 나눌 때 난수를 42로 고정했습니다. 같은 시험용 데이터에서 가중치를 켠 뒤 재현율은 0.80, 0.72, 0.82이고 F1은 0.241, 0.255, 0.201이었습니다."
+        }
+      ],
+      "checklist": "c34"
     }
-   ],
-   "checklist": "c34"
-  }
- ],
- "summary": "후보 세 모델과 베이스라인의 비교표를 README에 옮깁니다. 다음 페이지에서 혼동행렬과 평가지표로 결과를 자세히 읽고 최종 모델을 고릅니다."
+  ],
+  "summary": "다음 페이지에서는 세 모델을 여러 지표로 평가하고, 우리 탐구 질문에 맞는 지표로 최종 모델을 고릅니다."
 }

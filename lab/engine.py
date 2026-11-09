@@ -20,7 +20,8 @@
     {"who": "rubric", "cp": "c34", "item": "m-1", "checked": [0, 1], "text": "빠진 것·다음 질문으로 이어지는 까닭(선택)"}
   ],
   "summary": "마무리 글(마크다운)",
-  "setup": "페이지를 열 때 조용히 실행할 코드(선택, 앞 페이지에서 이어지는 df 등)", "setup_note": "그 안내 한 줄(선택)"
+  "setup": "페이지를 열 때 조용히 실행할 코드(선택, 앞 페이지에서 이어지는 df 등)", "setup_note": "그 안내 한 줄(선택)",
+  "code_fold": true(선택, 코드를 '코드 보기'로 접고 실행한 앱 화면을 먼저 보여 준다)
 }
 단계 사이에 이어지는 변수(df, df_prep 등)는 앞 단계의 코드를 차례로 다시 실행해 만든다.
 구술 인터뷰 대비 카드(who: oral)의 질문과 체크리스트는 content/oral.json에서 읽는다. 이 파일은 2026-ds-danggok의
@@ -239,7 +240,11 @@ def run_chat(name):
             st.markdown('**학생**' if role == 'user' else '**AI**')
             md(s['text'])
             if s.get('code'):
-                st.code(s['code'], language='python')
+                if sc.get('code_fold'):   # 앱 화면을 먼저 보게 코드는 접어 둔다
+                    with st.expander('코드 보기'):
+                        st.code(s['code'], language='python')
+                else:
+                    st.code(s['code'], language='python')
                 _run_code(s['code'], ns, i)
             if s.get('after'):
                 md(s['after'])
